@@ -1,0 +1,11 @@
+[root]
+name = "playground"
+version = "0.1.0"
+dependencies = [
+ "froggy 0.1.1",
+]
+
+[[package]]
+name = "froggy"
+version = "0.1.1"
+
