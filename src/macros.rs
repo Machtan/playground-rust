@@ -199,3 +199,22 @@ macro_rules! component_storage {
         }
     }
 }
+
+/// Describes that all components stored by the member of the type is also
+/// stored by the type.
+#[macro_export]
+macro_rules! contains_components {
+    (
+        $type:ty => $member:ident: $comp_type:ty
+    ) => {
+        impl<C> traits::HasCompStore<C> for $type where C: traits::CompId, $comp_type: HasCompStore<C> {
+            fn get_mut_components(&mut self) -> &mut froggy::Storage<<C as traits::CompId>::Type> {
+                self.$member.get_mut_components()
+            }
+
+            fn get_components(&self) -> &froggy::Storage<<C as traits::CompId>::Type> {
+                self.$member.get_components()
+            }
+        }
+    }
+}

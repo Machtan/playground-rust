@@ -31,11 +31,6 @@ pub trait ProcId {
     /// 
     /// Example: `(StorageRc<u32>, StorageRc<String>)`.
     type ArgRefs: Clone;
-    
-    /// What additional arguments should be passed through to it.
-    ///
-    /// Example: `(&mut Renderer, &Input)`.
-    type ExtraArgs;
 }
 
 pub trait IntoProcArgs<P: ProcId> {

@@ -4,25 +4,130 @@ pub mod traits;
 #[macro_use]
 pub mod macros;
 
-use traits::{ProcId, CompId, EntityId, HasComp, HasProc, HasCompStore, 
-    HasProcStore, HasEntityStore, AddEntityToStore, IntoProcArgs};
-use froggy::{Storage, StorageRc}; 
+use traits::{EntityId, HasCompStore, HasProcStore, HasEntityStore, AddEntityToStore};
+use froggy::{Storage};
 
-macro_rules! contains_components {
+macro_rules! process {
     (
-        $type:ty => $member:ident: $comp_type:ty
+        $( #[$meta:meta] )*
+        pub mod $mod:ident {
+            $proc_id:ident::run( 
+                // Mutable components, always first.
+                $( mut $mut_arg:ident[$mut_gensym:ident] : &mut $mut_comp:ident, )*
+                
+                // Immutable components.
+                $( ref $arg:ident[$gensym:ident] : & $comp:ident, )*
+                
+                // External arguments (relevant here?)
+                $( ext $ext_arg:ident : $ext_ty:ty, )*
+            ) $body:block
+        }
     ) => {
-        impl<C> HasCompStore<C> for $type where C: CompId, $comp_type: HasCompStore<C> {
-            fn get_mut_components(&mut self) -> &mut froggy::Storage<<C as CompId>::Type> {
-                self.$member.get_mut_components()
+        $( #[$meta] )*
+        pub mod $mod {
+            use super::traits;
+            use super::froggy;
+            use std::fmt::Debug;
+            $(
+                use super::$mut_comp;
+            )*
+            $(
+                use super::$comp;
+            )*
+            
+            /// Indices to arguments of this process.
+            pub type ArgRefs = ( $( froggy::StorageRc<<$comp as traits::CompId>::Type> ),* );
+            
+            // Arguments to this function
+            // pub type Args = ( $( &mut $mut_comp, )* $( &$comp, )* );
+            
+            /// Identifies this process.
+            pub struct $proc_id;
+            
+            impl traits::ProcId for $proc_id {
+                type ArgRefs = self::ArgRefs;
             }
+            
+            unsafe impl<T> traits::HasProc<self::$proc_id> for T 
+              where T: traits::HasProcStore<self::$proc_id>
+                  $( + traits::HasCompStore<$mut_comp> )*
+                  $( + traits::HasCompStore<$comp> )*
+            {}
+            
+            impl $proc_id {
+                pub fn run<S>(sim: &mut S $(, $ext_arg : $ext_ty )* )
+                  where S: traits::HasProc<self::$proc_id> 
+                         + traits::HasProcStore<self::$proc_id>
+                      $( + traits::HasCompStore<$mut_comp> )*
+                      $( + traits::HasCompStore<$comp> )*
+                {
+                    $(  
+                        let mut $mut_arg = <S as traits::HasCompStore<$mut_comp>>::get_mut_components(sim).write();
+                    )*
+                    $(
+                        let $arg = <S as traits::HasCompStore<$comp>>::get_components(sim).read();
+                    )*
+                    
+                    for &( $( ref $mut_gensym, )* $( ref $gensym, )* )
+                    in &<S as traits::HasProcStore<self::$proc_id>>::process_members(sim).read() {
+                        $(
+                            let $mut_arg = $mut_arg.get_mut($mut_gensym);
+                        )*
+                        $(
+                            let $arg = $arg.get($gensym);
+                        )*
+                        $body
+                    }
+                }
+            }
+            
+            // Add the debug clause to allow the concatenation of bounds.
+            // Could as well be a useless blanket implemented trait.
+            impl<T> traits::IntoProcArgs<self::$proc_id> for T
+              where T: Debug 
+                       $( + traits::HasComp<$mut_comp> )*
+                       $( + traits::HasComp<$comp> )*
+            {
+                fn into_args(&self) -> self::ArgRefs {
+                    (
+                        $(<T as traits::HasComp<$mut_comp>>::get(self).clone() , )* 
+                        $(<T as traits::HasComp<$comp>>::get(self).clone() , )*
+                    )
+                }
+            }
+        }
+        
+        // Bring the id into scope 
+        pub use self::$mod::$proc_id;
+    }
+}
 
-            fn get_components(&self) -> &froggy::Storage<<C as CompId>::Type> {
-                self.$member.get_components()
-            }
+process! {
+    pub mod print_info {
+        PPrintInfo::run(ref name[n]: &CName, ref age[a]: &CAge,) { 
+            println!("{} is {} year(s) old", name, age); 
         }
     }
 }
+
+/*pub type PrintInfoArgs = (StorageRc<String>, StorageRc<u32>);
+
+impl<T> IntoProcArgs<PrintInfoProc> for T where T: HasComp<CName> + HasComp<CAge> {
+    fn into_args(&self) -> PrintInfoArgs {
+        (<T as HasComp<CName>>::get(self).clone(), <T as HasComp<CAge>>::get(self).clone())
+    }
+}
+
+unsafe impl<T> HasProc<PrintInfoProc> for T 
+  where T: HasProcStore<PrintInfoProc>
+         + HasCompStore<CName>
+         + HasCompStore<CAge> 
+{}
+
+pub struct PrintInfoProc;
+impl ProcId for PrintInfoProc {
+    type ArgRefs = PrintInfoArgs;
+}*/
 
 // ====== Component definitions ======
 component! { CName: String }
@@ -50,32 +155,12 @@ entity! {
             age: CAge,
         }
         processes: {
-            PrintInfoProc
+            PPrintInfo
         }
     }
 }
 
 // ======= Processes =========
-
-pub type PrintInfoArgs = (StorageRc<String>, StorageRc<u32>);
-
-impl<T> IntoProcArgs<PrintInfoProc> for T where T: HasComp<CName> + HasComp<CAge> {
-    fn into_args(&self) -> PrintInfoArgs {
-        (<T as HasComp<CName>>::get(self).clone(), <T as HasComp<CAge>>::get(self).clone())
-    }
-}
-
-unsafe impl<T> HasProc<PrintInfoProc> for T 
-  where T: HasProcStore<PrintInfoProc>
-         + HasCompStore<CName>
-         + HasCompStore<CAge> 
-{}
-
-pub struct PrintInfoProc;
-impl ProcId for PrintInfoProc {
-    type ArgRefs = PrintInfoArgs;
-    type ExtraArgs = ();
-}
 
 // ====== SIM data ====== 
 
@@ -86,7 +171,7 @@ struct Entities {
 
 #[derive(Debug, Default)]
 struct Processes {
-    print_info: Storage<PrintInfoArgs>,
+    print_info: Storage<print_info::ArgRefs>,
 }
 
 #[derive(Debug, Default)]
@@ -102,25 +187,17 @@ impl Sim {
     }
     
     pub fn update(&mut self) {
-        {
-            let names = <Sim as HasCompStore<CName>>::get_components(self).read();
-            let ages = <Sim as HasCompStore<CAge>>::get_components(self).read();
-            for &(ref name, ref age) in &self.process_members().read() {
-                let name = names.get(name);
-                let age = ages.get(age);
-                println!("{} is {} year(s) old", name, age);
-            }
-        }
+        PPrintInfo::run(self);
     }
 }
 
 
-impl HasProcStore<PrintInfoProc> for Sim {
-    fn process_members_mut(&mut self) -> &mut Storage<PrintInfoArgs> {
+impl HasProcStore<PPrintInfo> for Sim {
+    fn process_members_mut(&mut self) -> &mut Storage<print_info::ArgRefs> {
         &mut self.processes.print_info
     }
     
-    fn process_members(&self) -> &Storage<PrintInfoArgs> {
+    fn process_members(&self) -> &Storage<print_info::ArgRefs> {
         &self.processes.print_info
     }
 }
@@ -151,8 +228,8 @@ fn main() {
     //println!("\n==== AFTER WRITE ====\n");
     
     //println!("Sim: {:?}", sim);
-    println!("print_info: {:?}", sim.processes.print_info);
-    println!("players:    {:?}", sim.entities.players);
+    //println!("print_info: {:?}", sim.processes.print_info);
+    //println!("players:    {:?}", sim.entities.players);
     
     sim.update();
 }
