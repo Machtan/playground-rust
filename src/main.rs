@@ -8,16 +8,44 @@ use traits::{ProcId, CompId, EntityId, HasComp, HasProc, HasCompStore,
     HasProcStore, HasEntityStore, AddEntityToStore, IntoProcArgs};
 use froggy::{Storage, StorageRc}; 
 
+macro_rules! component {
+    ( $name:ident : $type:ty) => {
+        /// A component.
+        #[derive(Debug, Clone, Copy)]
+        pub struct $name;
+        
+        impl traits::CompId for $name {
+            type Type = $type;
+        }
+    }
+}
+
+/*macro_rules! components_and_storage {
+    (
+        $( #[$storage_meta:meta] )*
+        pub struct $storage:ident {
+            $(
+            
+            )
+        }
+    ) => {
+    
+    }
+}*/
+
+// ====== Component definitions ======
+component! { CName: String }
+component! { CAge: u32 }
+
+
 // ============= Macros ================
 
-// TODO: Should this make a micro-module for namespacing purposes?
-// It's super annoying to have so many gensym arguments.
-
 entity! {
-    player: {
+    /// The avatar that the player controls in the game.
+    pub mod player {
         components: {
-            name: NameId, 
-            age: AgeId,
+            name: CName, 
+            age: CAge,
         }
         processes: {
             PrintInfoProc
@@ -29,16 +57,16 @@ entity! {
 
 pub type PrintInfoArgs = (StorageRc<String>, StorageRc<u32>);
 
-impl<T> IntoProcArgs<PrintInfoProc> for T where T: HasComp<NameId> + HasComp<AgeId> {
+impl<T> IntoProcArgs<PrintInfoProc> for T where T: HasComp<CName> + HasComp<CAge> {
     fn into_args(&self) -> PrintInfoArgs {
-        (<T as HasComp<NameId>>::get(self).clone(), <T as HasComp<AgeId>>::get(self).clone())
+        (<T as HasComp<CName>>::get(self).clone(), <T as HasComp<CAge>>::get(self).clone())
     }
 }
 
 unsafe impl<T> HasProc<PrintInfoProc> for T 
   where T: HasProcStore<PrintInfoProc>
-         + HasCompStore<NameId>
-         + HasCompStore<AgeId> 
+         + HasCompStore<CName>
+         + HasCompStore<CAge> 
 {}
 
 pub struct PrintInfoProc;
@@ -78,8 +106,8 @@ impl Sim {
     
     pub fn update(&mut self) {
         {
-            let names = <Sim as HasCompStore<NameId>>::get_components(self).read();
-            let ages = <Sim as HasCompStore<AgeId>>::get_components(self).read();
+            let names = <Sim as HasCompStore<CName>>::get_components(self).read();
+            let ages = <Sim as HasCompStore<CAge>>::get_components(self).read();
             for &(ref name, ref age) in &self.process_members().read() {
                 let name = names.get(name);
                 let age = ages.get(age);
@@ -105,37 +133,25 @@ impl HasEntityStore<player::Id> for Sim {
     }
 }
 
-impl HasCompStore<NameId> for Sim {
-    fn get_mut_components(&mut self) -> &mut Storage<<NameId as CompId>::Type> {
+impl HasCompStore<CName> for Sim {
+    fn get_mut_components(&mut self) -> &mut Storage<<CName as CompId>::Type> {
         &mut self.components.names
     }
     
-    fn get_components(&self) -> &Storage<<NameId as CompId>::Type> {
+    fn get_components(&self) -> &Storage<<CName as CompId>::Type> {
         &self.components.names
     }
 }
 
-impl HasCompStore<AgeId> for Sim {
-    fn get_mut_components(&mut self) -> &mut Storage<<AgeId as CompId>::Type> {
+impl HasCompStore<CAge> for Sim {
+    fn get_mut_components(&mut self) -> &mut Storage<<CAge as CompId>::Type> {
         &mut self.components.ages
     }
     
-    fn get_components(&self) -> &Storage<<AgeId as CompId>::Type> {
+    fn get_components(&self) -> &Storage<<CAge as CompId>::Type> {
         &self.components.ages
     }
 }
-
-// ====== Component definitions ======
-pub struct NameId;
-impl CompId for NameId {
-    type Type = String;
-}
-
-pub struct AgeId;
-impl CompId for AgeId {
-    type Type = u32;
-}
-
 
 fn main() {
     println!("Hello world!");

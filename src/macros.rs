@@ -4,6 +4,7 @@ extern crate froggy;
 ///
 /// # Generation example
 /// ```
+/// /// <Your docstrings and/or attributes here>
 /// pub mod player {
 ///     // How the data should be stored
 ///     pub type ProcData = (StorageRc<C> for C in components);
@@ -28,7 +29,8 @@ extern crate froggy;
 #[macro_export]
 macro_rules! entity {
     (
-        $entity:ident: {
+        $( #[ $mod_meta:meta ] )*
+        pub mod $entity:ident {
             components: {
                 $(
                     $comp_name:ident : $comp_id:ident,
@@ -39,7 +41,7 @@ macro_rules! entity {
             }
         }
     ) => {
-    /// Namespaced entity declaration [macro-generated].
+    $( #[ $mod_meta ] )*
     pub mod $entity {
         use super::traits;
         use super::froggy;
