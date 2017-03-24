@@ -37,7 +37,7 @@ macro_rules! entity {
         #[derive(Debug, Clone, Copy)]
         pub struct $entity_id;
         
-        pub type $entity_data = ( $( froggy::StorageRc<<$proc_id as traits::ProcId>::Args> ),* ,);
+        pub type $entity_data = ( $( froggy::StorageRc<<$proc_id as traits::ProcId>::ArgRefs> ),* ,);
         
         impl traits::EntityId for $entity_id {
             type Data = $entity_data;

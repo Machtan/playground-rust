@@ -10,10 +10,15 @@ pub trait CompId {
     type Type: Debug;
 }
 
-/// Signifies that the object stores an index to a component of the identified type.
-pub trait HasComp<C: CompId> {
-    #[inline]
-    fn get(&self, i: C) -> &StorageRc<C::Type>;
+/// Identifies and describes an entity; a named collection of components and behaviors.
+pub trait EntityId {
+    /// The data type that is stored for this entity in the simulation/system/world.
+    /// 
+    /// This should be a type that contains references to all the process arguments
+    /// that 'belong' to this entity.
+    ///
+    /// Example: `(StorageRc<<RenderProc as ProcId>::Args>, StorageRc<<MoveProc as ProcId>::Args>)`.
+    type Data: Debug;
 }
 
 // TODO: Processes are 'weaker' than entities now, see if they can be improved
@@ -25,11 +30,22 @@ pub trait ProcId {
     /// so for `print_info(age: &u32, name: &String)` this would be:
     /// 
     /// Example: `(StorageRc<u32>, StorageRc<String>)`.
-    type Args: Clone;
+    type ArgRefs: Clone;
+    
     /// What additional arguments should be passed through to it.
     ///
     /// Example: `(&mut Renderer, &Input)`.
     type ExtraArgs;
+}
+
+pub trait IntoProcArgs<P: ProcId> {
+    fn into_args(&self) -> <P as ProcId>::ArgRefs;
+}
+
+/// Signifies that the object stores an index to a component of the identified type.
+pub trait HasComp<C: CompId> {
+    #[inline]
+    fn get(&self, i: C) -> &StorageRc<C::Type>;
 }
 
 /// Signifies that the object contains a storage for arguments to the
@@ -37,33 +53,23 @@ pub trait ProcId {
 pub trait HasProcStore<P: ProcId> {
     /// Returns a mutable reference to the store of arguments to the process.
     #[inline]
-    fn process_members_mut(&mut self, _: P) -> &mut Storage<P::Args>;
+    fn process_members_mut(&mut self, _: P) -> &mut Storage<P::ArgRefs>;
     
     /// Returns an immutable reference to the store of arguments to the process.
     #[inline]
-    fn process_members(&self, _: P) -> & Storage<P::Args>;
-    
-    /// Runs the given function for each entity in this process, passing 
-    /// references to the components of the entity as arguments.
-    #[inline]
-    fn process_each<F>(&self, p: P, mut f: F) where F: FnMut(&P::Args) {
-        for arg in &self.process_members(p).read() {
-            f(arg);
-        }
-    }
+    fn process_members(&self, _: P) -> & Storage<P::ArgRefs>;
 }
 
 /// under construction.
 pub trait HasProc<P: ProcId> : HasProcStore<P> {
+    
     /// Adds an entity to this process, by giving storage indices to its components.
     #[inline]
-    fn add_to_process<E>(&mut self, p: P, e: E) -> StorageRc<P::Args> 
-      where E: Into<P::Args> 
+    fn add_to_process<E>(&mut self, p: P, e: E) -> StorageRc<P::ArgRefs> 
+      where E: IntoProcArgs<P> 
     {
-        self.process_members_mut(p).write().insert(e.into())
+        self.process_members_mut(p).write().insert(e.into_args())
     }
-    
-    //fn process<F, A>(&mut self, _: P, extra: P::ExtraArgs, mut f: F) where F: FnMut(A, P::ExtraArgs);
 }
 
 /// Signifies that the object contains a storage for components of the identified type.
@@ -75,17 +81,6 @@ pub trait HasCompStore<C: CompId> {
     /// Returns an immutable reference to the component store.
     #[inline]
     fn get_components(&self, _: C) -> &Storage<C::Type>;
-}
-
-/// Identifies and describes an entity; a named collection of components and behaviors.
-pub trait EntityId {
-    /// The data type that is stored for this entity in the simulation/system/world.
-    /// 
-    /// This should be a type that contains references to all the process arguments
-    /// that 'belong' to this entity.
-    ///
-    /// Example: `(StorageRc<<RenderProc as ProcId>::Args>, StorageRc<<MoveProc as ProcId>::Args>)`.
-    type Data: Debug;
 }
 
 /// Signifies that the object contains a storage for entities of the identified type.

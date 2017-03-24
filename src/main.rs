@@ -4,7 +4,8 @@ mod traits;
 #[macro_use]
 mod macros;
 
-use traits::{ProcId, CompId, EntityId, HasComp, HasProc, HasCompStore, HasProcStore, HasEntityStore, AddEntityToStore};
+use traits::{ProcId, CompId, EntityId, HasComp, HasProc, HasCompStore, 
+    HasProcStore, HasEntityStore, AddEntityToStore, IntoProcArgs};
 use froggy::{Storage, StorageRc}; 
 
 // ============= Macros ================
@@ -29,18 +30,23 @@ entity! {
 
 // ======= Processes =========
 
-#[derive(Debug, Clone)]
-pub struct PrintInfoArgs (StorageRc<String>, StorageRc<u32>);
+pub type PrintInfoArgs = (StorageRc<String>, StorageRc<u32>);
 
-impl<T> From<T> for PrintInfoArgs where T: HasComp<NameId> + HasComp<AgeId> {
-    fn from(value: T) -> PrintInfoArgs {
-        PrintInfoArgs(value.get(NameId).clone(), value.get(AgeId).clone())
+impl<T> IntoProcArgs<PrintInfoProc> for T where T: HasComp<NameId> + HasComp<AgeId> {
+    fn into_args(&self) -> PrintInfoArgs {
+        (self.get(NameId).clone(), self.get(AgeId).clone())
     }
 }
 
+impl<T> HasProc<PrintInfoProc> for T 
+  where T: HasProcStore<PrintInfoProc>
+         + HasCompStore<NameId>
+         + HasCompStore<AgeId> 
+{}
+
 pub struct PrintInfoProc;
 impl ProcId for PrintInfoProc {
-    type Args = PrintInfoArgs;
+    type ArgRefs = PrintInfoArgs;
     type ExtraArgs = ();
 }
 
@@ -74,15 +80,15 @@ impl Sim {
     }
     
     pub fn update(&mut self) {
-        /*{
-            let names = self.components.names.read();
-            let ages = self.components.ages.read();
-            self.for_each(PrintInfoProc, |&PrintInfoArgs(ref name, ref age)| {
+        {
+            let names = self.get_components(NameId).read();
+            let ages = self.get_components(AgeId).read();
+            for &(ref name, ref age) in &self.process_members(PrintInfoProc).read() {
                 let name = names.get(name);
                 let age = ages.get(age);
                 println!("{} is {} year(s) old", name, age);
-            });
-        }*/
+            }
+        }
     }
 }
 
@@ -120,23 +126,6 @@ impl HasCompStore<AgeId> for Sim {
     fn get_components(&self, _: AgeId) -> &Storage<<AgeId as CompId>::Type> {
         &self.components.ages
     }
-}
-
-// Blanket, woo!
-impl<T> HasProc<PrintInfoProc> for T 
-  where T: HasProcStore<PrintInfoProc> 
-         + HasCompStore<NameId>
-         + HasCompStore<AgeId>
-{
-    /*fn process<F, (&String, &u32)>(&mut self, _: PrintInfoProc, extra: (), mut f: F) where A: , F: FnMut(A, ()) {
-        let names = self.get_components(NameId).read();
-        let ages = self.get_components(AgeId).read();
-        self.process_each(PrintInfoProc, |&PrintInfoArgs(ref name, ref age)| {
-            let name = names.get(name);
-            let age = ages.get(age);
-            f((name, age), ());
-        });
-    }*/
 }
 
 // ====== Component definitions ======
