@@ -8,6 +8,22 @@ use traits::{ProcId, CompId, EntityId, HasComp, HasProc, HasCompStore,
     HasProcStore, HasEntityStore, AddEntityToStore, IntoProcArgs};
 use froggy::{Storage, StorageRc}; 
 
+macro_rules! contains_components {
+    (
+        $type:ty => $member:ident: $comp_type:ty
+    ) => {
+        impl<C> HasCompStore<C> for $type where C: CompId, $comp_type: HasCompStore<C> {
+            fn get_mut_components(&mut self) -> &mut froggy::Storage<<C as CompId>::Type> {
+                self.$member.get_mut_components()
+            }
+
+            fn get_components(&self) -> &froggy::Storage<<C as CompId>::Type> {
+                self.$member.get_components()
+            }
+        }
+    }
+}
+
 // ====== Component definitions ======
 component! { CName: String }
 component! { CAge: u32 }
@@ -18,6 +34,10 @@ component_storage! {
         names: CName,
         ages: CAge,
     }
+}
+
+contains_components! {
+    Sim => components: Components
 }
 
 // ============= Macros ================
@@ -91,16 +111,6 @@ impl Sim {
                 println!("{} is {} year(s) old", name, age);
             }
         }
-    }
-}
-
-impl<C> HasCompStore<C> for Sim where C: CompId, Components: HasCompStore<C> {
-    fn get_mut_components(&mut self) -> &mut froggy::Storage<<C as CompId>::Type> {
-        self.components.get_mut_components()
-    }
-
-    fn get_components(&self) -> &froggy::Storage<<C as CompId>::Type> {
-        self.components.get_components()
     }
 }
 
