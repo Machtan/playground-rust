@@ -14,10 +14,7 @@ use froggy::{Storage, StorageRc};
 // It's super annoying to have so many gensym arguments.
 
 entity! {
-    pub struct Player {
-        id: pub struct PlayerId;
-        create: pub struct CreatePlayer;
-        data: pub type PlayerData;
+    player: {
         components: {
             name: NameId, 
             age: AgeId,
@@ -38,7 +35,7 @@ impl<T> IntoProcArgs<PrintInfoProc> for T where T: HasComp<NameId> + HasComp<Age
     }
 }
 
-impl<T> HasProc<PrintInfoProc> for T 
+unsafe impl<T> HasProc<PrintInfoProc> for T 
   where T: HasProcStore<PrintInfoProc>
          + HasCompStore<NameId>
          + HasCompStore<AgeId> 
@@ -59,7 +56,7 @@ struct Components {
 
 #[derive(Debug, Default)]
 struct Entities {
-    players: Vec<PlayerData>,
+    players: Vec<player::ProcData>,
 }
 
 #[derive(Debug, Default)]
@@ -102,8 +99,8 @@ impl HasProcStore<PrintInfoProc> for Sim {
     }
 }
 
-impl HasEntityStore<PlayerId> for Sim {
-    fn get_mut_entities(&mut self, _: PlayerId) -> &mut Vec<<PlayerId as EntityId>::Data> {
+impl HasEntityStore<player::Id> for Sim {
+    fn get_mut_entities(&mut self, _: player::Id) -> &mut Vec<<player::Id as EntityId>::Data> {
         &mut self.entities.players
     }
 }
@@ -145,10 +142,10 @@ fn main() {
 
     let mut sim = Sim::new();
     
-    let player = Player::new(String::from("Jakob"), 22);
+    let player = player::Data::new(String::from("Jakob"), 22);
     player.add_to(&mut sim);
     
-    let another = Player::new(String::from("test"), 9001);
+    let another = player::Data::new(String::from("test"), 9001);
     another.add_to(&mut sim);
     
     //println!("\n==== BEFORE WRITE ====\n");

@@ -60,8 +60,23 @@ pub trait HasProcStore<P: ProcId> {
     fn process_members(&self, _: P) -> & Storage<P::ArgRefs>;
 }
 
-/// under construction.
-pub trait HasProc<P: ProcId> : HasProcStore<P> {
+/// Signifies that the object has the required components to add entities 
+/// to the identified process.
+///
+/// It is not truly `unsafe` to implement the trait, but can lead to logic errors
+/// if the trait bounds are not set correctly.
+///
+/// `Self` (the implementor) should be constrained to require the components 
+/// and processes needed by the identified process
+/// 
+/// # example
+/// ```no_run
+/// unsafe impl<T> HasProc<AgePrinter> for T 
+///   where T: HasProcStore<AgePrinter>
+///          + HasCompStore<AgeId> 
+/// {}
+/// ```
+pub unsafe trait HasProc<P: ProcId> : HasProcStore<P> {
     
     /// Adds an entity to this process, by giving storage indices to its components.
     #[inline]
@@ -93,11 +108,14 @@ pub trait HasEntityStore<E: EntityId> {
 /// Signifies that the entity can be added to a simulation that fulfils a
 /// set of requirements.
 ///
+/// It is not truly `unsafe` to implement the trait, but can lead to logic errors
+/// if the trait bounds are not set correctly.
+///
 /// `<S>` should be constrained to include the required components and processes.
 ///
 /// # Example
 /// ```no_run
-/// impl<S> AddEntityToStore<EPlayer, S> for Player 
+/// unsafe impl<S> AddEntityToStore<EPlayer, S> for Player 
 ///   where S: HasEntityStore<EPlayer>
 ///          + HasCompStore<CName>
 ///          + HasCompStore<CAge>
@@ -105,6 +123,6 @@ pub trait HasEntityStore<E: EntityId> {
 /// {
 ///     fn add_to(self, sim: &mut S) { ... }
 /// ```
-pub trait AddEntityToStore<E: EntityId, S: HasEntityStore<E>> {
+pub unsafe trait AddEntityToStore<E: EntityId, S: HasEntityStore<E>> {
     fn add_to(self, sim: &mut S);
 }
