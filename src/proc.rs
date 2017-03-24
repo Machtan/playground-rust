@@ -1,17 +1,17 @@
 extern crate froggy;
 
-use froggy::{Storage, StorageIndex};
+use froggy::{Storage, StorageRc};
 
 pub trait CompId {
     type CompType: Debug;
 }
 
 pub trait Comp<I: CompId> {
-    fn get(&self, i: I) -> &StorageIndex<I::CompType>;
+    fn get(&self, i: I) -> &StorageRc<I::CompType>;
 }
 
 #[derive(Debug, Clone)]
-pub struct PrintInfoArgs (StorageIndex<String>, StorageIndex<u32>);
+pub struct PrintInfoArgs (StorageRc<String>, StorageRc<u32>);
 
 impl<T> From<T> for PrintInfoArgs where T: Comp<NameId> + Comp<AgeId> {
     fn from(value: T) -> PrintInfoArgs {
@@ -36,7 +36,7 @@ pub trait Proc<P: ProcId> {
     fn process(&mut self, _: P, args: <P as ProcId>::ExtraArgs);
 }
 
-type PersonData = (StorageIndex<PrintInfoArgs>,);
+type PersonData = (StorageRc<PrintInfoArgs>,);
 
 #[derive(Debug, Default)]
 struct Components {
@@ -74,7 +74,7 @@ impl Sim {
 impl Proc<PrintInfoProc> for Sim {
     fn add_to_process<E>(&mut self, _: PrintInfoProc, e: E) -> PrintInfoArgs where E: Into<<PrintInfoProc as ProcId>::Args> {
         let args = e.into();
-        self.p_print_info.write().create(args.clone());
+        self.p_print_info.write().insert(args.clone());
         args
     }
     
@@ -82,8 +82,8 @@ impl Proc<PrintInfoProc> for Sim {
         let names = self.names.read();
         let ages = self.ages.read();
         for &PrintInfoArgs(ref name, ref age) in &self.p_print_info.read() {
-            let name = names.access(name);
-            let age = ages.access(age);
+            let name = names.get(name);
+            let age = ages.get(age);
             println!("{} is {} year(s) old", name, age);
         }
     }
@@ -91,8 +91,8 @@ impl Proc<PrintInfoProc> for Sim {
 
 #[derive(Debug, Clone)]
 struct PersonCreateArgs {
-    name: StorageIndex<String>,
-    age: StorageIndex<u32>,
+    name: StorageRc<String>,
+    age: StorageRc<u32>,
 }
 
 pub struct NameId;
@@ -106,11 +106,11 @@ impl CompId for AgeId {
 }
 
 impl Comp<NameId> for PersonCreateArgs {
-    fn get(&self, _i: NameId) -> &StorageIndex<String> { &self.name }
+    fn get(&self, _i: NameId) -> &StorageRc<String> { &self.name }
 }
 
 impl Comp<AgeId> for PersonCreateArgs {
-    fn get(&self, _i: AgeId) -> &StorageIndex<u32> { &self.age }
+    fn get(&self, _i: AgeId) -> &StorageRc<u32> { &self.age }
 }
 
 
@@ -119,9 +119,9 @@ fn main() {
     /*let persson = Person { name: String::from("Markus"), age: 37 };
     print_age_name(&persson);*/
     let mut sim = Sim::new();
-    let name = sim.names.write().create(String::from("Markus"));
-    let age = sim.ages.write().create(37);
-    let create = PersonCreateArgs { name, age };
-    let pi_data = sim.add_to_process(PrintInfoProc, create.clone());
+    let name = sim.names.write().insert(String::from("Markus"));
+    let age = sim.ages.write().insert(37);
+    let insert = PersonCreateArgs { name, age };
+    let pi_data = sim.add_to_process(PrintInfoProc, insert.clone());
     sim.update();
 }

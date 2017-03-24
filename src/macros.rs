@@ -37,7 +37,7 @@ macro_rules! entity {
         #[derive(Debug, Clone, Copy)]
         pub struct $entity_id;
         
-        pub type $entity_data = ( $( froggy::StorageIndex<<$proc_id as traits::ProcId>::Args> ),* ,);
+        pub type $entity_data = ( $( froggy::StorageRc<<$proc_id as traits::ProcId>::Args> ),* ,);
         
         impl traits::EntityId for $entity_id {
             type Data = $entity_data;
@@ -49,12 +49,12 @@ macro_rules! entity {
                     + traits::HasCompStore<$comp_id>
                 )*
                 $(
-                    + traits::HasProcStore<$proc_id>
+                    + traits::HasProc<$proc_id>
                 )*
         {
             fn add_to(self, sim: &mut S) {
                 $(
-                    let $comp_name = sim.get_mut_components($comp_id).write().create(self.$comp_name);
+                    let $comp_name = sim.get_mut_components($comp_id).write().insert(self.$comp_name);
                 )*
                 let create_struct = $create_name {
                     $(
@@ -72,13 +72,13 @@ macro_rules! entity {
         #[derive(Debug, Clone)]
         pub struct $create_name {
             $(
-                pub $comp_name : froggy::StorageIndex<<$comp_id as traits::CompId>::Type>,
+                pub $comp_name : froggy::StorageRc<<$comp_id as traits::CompId>::Type>,
             )*
         }
         
         $(
             impl traits::HasComp<$comp_id> for $create_name {
-                fn get(&self, _i: $comp_id) -> &froggy::StorageIndex<<$comp_id as traits::CompId>::Type> {
+                fn get(&self, _i: $comp_id) -> &froggy::StorageRc<<$comp_id as traits::CompId>::Type> {
                     &self.$comp_name
                 }
             }

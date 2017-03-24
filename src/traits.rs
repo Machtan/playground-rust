@@ -1,6 +1,6 @@
 
 use std::fmt::Debug;
-use froggy::{Storage, StorageIndex};
+use froggy::{Storage, StorageRc};
 
 /// Identifies and describes a component; a data member of an entity.
 pub trait CompId {
@@ -12,18 +12,19 @@ pub trait CompId {
 
 /// Signifies that the object stores an index to a component of the identified type.
 pub trait HasComp<C: CompId> {
-    fn get(&self, i: C) -> &StorageIndex<C::Type>;
+    #[inline]
+    fn get(&self, i: C) -> &StorageRc<C::Type>;
 }
 
 // TODO: Processes are 'weaker' than entities now, see if they can be improved
 /// Identifies and describes a process.
 pub trait ProcId {
-    /// What arguments of the process should be stored. (a data type containing `StorageIndex`es )
+    /// What arguments of the process should be stored. (a data type containing `StorageRc`es )
     ///
     /// Think of it as the arguments to the function, but wrapped in storage indices
     /// so for `print_info(age: &u32, name: &String)` this would be:
     /// 
-    /// Example: `(StorageIndex<u32>, StorageIndex<String>)`.
+    /// Example: `(StorageRc<u32>, StorageRc<String>)`.
     type Args: Clone;
     /// What additional arguments should be passed through to it.
     ///
@@ -42,33 +43,38 @@ pub trait HasProcStore<P: ProcId> {
     #[inline]
     fn process_members(&self, _: P) -> & Storage<P::Args>;
     
-    /// Adds an entity to this process, by giving storage indices to its components.
-    #[inline]
-    fn add_to_process<E>(&mut self, p: P, e: E) -> StorageIndex<P::Args> 
-      where E: Into<P::Args> 
-    {
-        self.process_members_mut(p).write().create(e.into())
-    }
-    
     /// Runs the given function for each entity in this process, passing 
     /// references to the components of the entity as arguments.
     #[inline]
-    fn for_each<F>(&self, p: P, mut f: F) where F: FnMut(&P::Args) {
+    fn process_each<F>(&self, p: P, mut f: F) where F: FnMut(&P::Args) {
         for arg in &self.process_members(p).read() {
             f(arg);
         }
     }
 }
 
+/// under construction.
+pub trait HasProc<P: ProcId> : HasProcStore<P> {
+    /// Adds an entity to this process, by giving storage indices to its components.
+    #[inline]
+    fn add_to_process<E>(&mut self, p: P, e: E) -> StorageRc<P::Args> 
+      where E: Into<P::Args> 
+    {
+        self.process_members_mut(p).write().insert(e.into())
+    }
+    
+    //fn process<F, A>(&mut self, _: P, extra: P::ExtraArgs, mut f: F) where F: FnMut(A, P::ExtraArgs);
+}
+
 /// Signifies that the object contains a storage for components of the identified type.
 pub trait HasCompStore<C: CompId> {
     /// Returns a mutable reference to the component store.
+    #[inline]
     fn get_mut_components(&mut self, _: C) -> &mut Storage<C::Type>;
-}
-
-/// under construction.
-pub trait Proc<P: ProcId, A> : HasProcStore<P> {
-    fn process<F>(&mut self, _: P, extra: P::ExtraArgs, f: F) where F: FnMut(A, P::ExtraArgs);
+    
+    /// Returns an immutable reference to the component store.
+    #[inline]
+    fn get_components(&self, _: C) -> &Storage<C::Type>;
 }
 
 /// Identifies and describes an entity; a named collection of components and behaviors.
@@ -78,13 +84,14 @@ pub trait EntityId {
     /// This should be a type that contains references to all the process arguments
     /// that 'belong' to this entity.
     ///
-    /// Example: `(StorageIndex<<RenderProc as ProcId>::Args>, StorageIndex<<MoveProc as ProcId>::Args>)`.
+    /// Example: `(StorageRc<<RenderProc as ProcId>::Args>, StorageRc<<MoveProc as ProcId>::Args>)`.
     type Data: Debug;
 }
 
 /// Signifies that the object contains a storage for entities of the identified type.
 pub trait HasEntityStore<E: EntityId> {
     /// Returns a mutable reference to the entity store.
+    #[inline]
     fn get_mut_entities(&mut self, _: E) -> &mut Vec<E::Data>;
 }
 
