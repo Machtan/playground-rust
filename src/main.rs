@@ -1,8 +1,8 @@
 extern crate froggy;
 
-mod traits;
+pub mod traits;
 #[macro_use]
-mod macros;
+pub mod macros;
 
 use traits::{ProcId, CompId, EntityId, HasComp, HasProc, HasCompStore, 
     HasProcStore, HasEntityStore, AddEntityToStore, IntoProcArgs};
@@ -31,7 +31,7 @@ pub type PrintInfoArgs = (StorageRc<String>, StorageRc<u32>);
 
 impl<T> IntoProcArgs<PrintInfoProc> for T where T: HasComp<NameId> + HasComp<AgeId> {
     fn into_args(&self) -> PrintInfoArgs {
-        (self.get(NameId).clone(), self.get(AgeId).clone())
+        (<T as HasComp<NameId>>::get(self).clone(), <T as HasComp<AgeId>>::get(self).clone())
     }
 }
 
@@ -78,9 +78,9 @@ impl Sim {
     
     pub fn update(&mut self) {
         {
-            let names = self.get_components(NameId).read();
-            let ages = self.get_components(AgeId).read();
-            for &(ref name, ref age) in &self.process_members(PrintInfoProc).read() {
+            let names = <Sim as HasCompStore<NameId>>::get_components(self).read();
+            let ages = <Sim as HasCompStore<AgeId>>::get_components(self).read();
+            for &(ref name, ref age) in &self.process_members().read() {
                 let name = names.get(name);
                 let age = ages.get(age);
                 println!("{} is {} year(s) old", name, age);
@@ -90,37 +90,37 @@ impl Sim {
 }
 
 impl HasProcStore<PrintInfoProc> for Sim {
-    fn process_members_mut(&mut self, _: PrintInfoProc) -> &mut Storage<PrintInfoArgs> {
+    fn process_members_mut(&mut self) -> &mut Storage<PrintInfoArgs> {
         &mut self.processes.print_info
     }
     
-    fn process_members(&self, _: PrintInfoProc) -> &Storage<PrintInfoArgs> {
+    fn process_members(&self) -> &Storage<PrintInfoArgs> {
         &self.processes.print_info
     }
 }
 
 impl HasEntityStore<player::Id> for Sim {
-    fn get_mut_entities(&mut self, _: player::Id) -> &mut Vec<<player::Id as EntityId>::Data> {
+    fn get_mut_entities(&mut self) -> &mut Vec<<player::Id as EntityId>::Data> {
         &mut self.entities.players
     }
 }
 
 impl HasCompStore<NameId> for Sim {
-    fn get_mut_components(&mut self, _: NameId) -> &mut Storage<<NameId as CompId>::Type> {
+    fn get_mut_components(&mut self) -> &mut Storage<<NameId as CompId>::Type> {
         &mut self.components.names
     }
     
-    fn get_components(&self, _: NameId) -> &Storage<<NameId as CompId>::Type> {
+    fn get_components(&self) -> &Storage<<NameId as CompId>::Type> {
         &self.components.names
     }
 }
 
 impl HasCompStore<AgeId> for Sim {
-    fn get_mut_components(&mut self, _: AgeId) -> &mut Storage<<AgeId as CompId>::Type> {
+    fn get_mut_components(&mut self) -> &mut Storage<<AgeId as CompId>::Type> {
         &mut self.components.ages
     }
     
-    fn get_components(&self, _: AgeId) -> &Storage<<AgeId as CompId>::Type> {
+    fn get_components(&self) -> &Storage<<AgeId as CompId>::Type> {
         &self.components.ages
     }
 }

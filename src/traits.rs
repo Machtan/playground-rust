@@ -45,7 +45,7 @@ pub trait IntoProcArgs<P: ProcId> {
 /// Signifies that the object stores an index to a component of the identified type.
 pub trait HasComp<C: CompId> {
     #[inline]
-    fn get(&self, i: C) -> &StorageRc<C::Type>;
+    fn get(&self) -> &StorageRc<C::Type>;
 }
 
 /// Signifies that the object contains a storage for arguments to the
@@ -53,11 +53,11 @@ pub trait HasComp<C: CompId> {
 pub trait HasProcStore<P: ProcId> {
     /// Returns a mutable reference to the store of arguments to the process.
     #[inline]
-    fn process_members_mut(&mut self, _: P) -> &mut Storage<P::ArgRefs>;
+    fn process_members_mut(&mut self) -> &mut Storage<P::ArgRefs>;
     
     /// Returns an immutable reference to the store of arguments to the process.
     #[inline]
-    fn process_members(&self, _: P) -> & Storage<P::ArgRefs>;
+    fn process_members(&self) -> & Storage<P::ArgRefs>;
 }
 
 /// Signifies that the object has the required components to add entities 
@@ -80,10 +80,10 @@ pub unsafe trait HasProc<P: ProcId> : HasProcStore<P> {
     
     /// Adds an entity to this process, by giving storage indices to its components.
     #[inline]
-    fn add_to_process<E>(&mut self, p: P, e: E) -> StorageRc<P::ArgRefs> 
+    fn add_to_process<E>(&mut self, e: E) -> StorageRc<P::ArgRefs> 
       where E: IntoProcArgs<P> 
     {
-        self.process_members_mut(p).write().insert(e.into_args())
+        self.process_members_mut().write().insert(e.into_args())
     }
 }
 
@@ -91,18 +91,18 @@ pub unsafe trait HasProc<P: ProcId> : HasProcStore<P> {
 pub trait HasCompStore<C: CompId> {
     /// Returns a mutable reference to the component store.
     #[inline]
-    fn get_mut_components(&mut self, _: C) -> &mut Storage<C::Type>;
+    fn get_mut_components(&mut self) -> &mut Storage<C::Type>;
     
     /// Returns an immutable reference to the component store.
     #[inline]
-    fn get_components(&self, _: C) -> &Storage<C::Type>;
+    fn get_components(&self) -> &Storage<C::Type>;
 }
 
 /// Signifies that the object contains a storage for entities of the identified type.
 pub trait HasEntityStore<E: EntityId> {
     /// Returns a mutable reference to the entity store.
     #[inline]
-    fn get_mut_entities(&mut self, _: E) -> &mut Vec<E::Data>;
+    fn get_mut_entities(&mut self) -> &mut Vec<E::Data>;
 }
 
 /// Signifies that the entity can be added to a simulation that fulfils a
