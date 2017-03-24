@@ -8,35 +8,17 @@ use traits::{ProcId, CompId, EntityId, HasComp, HasProc, HasCompStore,
     HasProcStore, HasEntityStore, AddEntityToStore, IntoProcArgs};
 use froggy::{Storage, StorageRc}; 
 
-macro_rules! component {
-    ( $name:ident : $type:ty) => {
-        /// A component.
-        #[derive(Debug, Clone, Copy)]
-        pub struct $name;
-        
-        impl traits::CompId for $name {
-            type Type = $type;
-        }
-    }
-}
-
-/*macro_rules! components_and_storage {
-    (
-        $( #[$storage_meta:meta] )*
-        pub struct $storage:ident {
-            $(
-            
-            )
-        }
-    ) => {
-    
-    }
-}*/
-
 // ====== Component definitions ======
 component! { CName: String }
 component! { CAge: u32 }
 
+component_storage! {
+    /// Stores all the components!
+    pub struct Components {
+        names: CName,
+        ages: CAge,
+    }
+}
 
 // ============= Macros ================
 
@@ -76,11 +58,6 @@ impl ProcId for PrintInfoProc {
 }
 
 // ====== SIM data ====== 
-#[derive(Debug, Default)]
-struct Components {
-    names: Storage<String>,
-    ages: Storage<u32>,
-}
 
 #[derive(Debug, Default)]
 struct Entities {
@@ -117,6 +94,17 @@ impl Sim {
     }
 }
 
+impl<C> HasCompStore<C> for Sim where C: CompId, Components: HasCompStore<C> {
+    fn get_mut_components(&mut self) -> &mut froggy::Storage<<C as CompId>::Type> {
+        self.components.get_mut_components()
+    }
+
+    fn get_components(&self) -> &froggy::Storage<<C as CompId>::Type> {
+        self.components.get_components()
+    }
+}
+
+
 impl HasProcStore<PrintInfoProc> for Sim {
     fn process_members_mut(&mut self) -> &mut Storage<PrintInfoArgs> {
         &mut self.processes.print_info
@@ -130,26 +118,6 @@ impl HasProcStore<PrintInfoProc> for Sim {
 impl HasEntityStore<player::Id> for Sim {
     fn get_mut_entities(&mut self) -> &mut Vec<<player::Id as EntityId>::Data> {
         &mut self.entities.players
-    }
-}
-
-impl HasCompStore<CName> for Sim {
-    fn get_mut_components(&mut self) -> &mut Storage<<CName as CompId>::Type> {
-        &mut self.components.names
-    }
-    
-    fn get_components(&self) -> &Storage<<CName as CompId>::Type> {
-        &self.components.names
-    }
-}
-
-impl HasCompStore<CAge> for Sim {
-    fn get_mut_components(&mut self) -> &mut Storage<<CAge as CompId>::Type> {
-        &mut self.components.ages
-    }
-    
-    fn get_components(&self) -> &Storage<<CAge as CompId>::Type> {
-        &self.components.ages
     }
 }
 

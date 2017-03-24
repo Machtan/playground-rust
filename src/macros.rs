@@ -132,3 +132,70 @@ macro_rules! entity {
     }
     }
 }
+
+/// Declares a component with the given name and type.
+#[macro_export]
+macro_rules! component {
+    ( $name:ident : $type:ty) => {
+        /// A component.
+        #[derive(Debug, Clone, Copy)]
+        pub struct $name;
+        
+        impl traits::CompId for $name {
+            type Type = $type;
+        }
+    }
+}
+
+/// Declares a storage type for the identified components.
+#[macro_export]
+macro_rules! component_storage {
+    // No trailing comma
+    (
+        $( #[$storage_meta:meta] )*
+        pub struct $storage:ident {
+            $(
+                $member:ident : $component:ty
+            ),*
+        }
+    ) => {
+        $( #[ $storage_meta ] )*
+        #[derive(Debug, Default)]
+        pub struct $storage {
+            $(
+                /// A component [macro-generated].
+                pub $member : froggy::Storage<<$component as traits::CompId>::Type>
+            ),*
+        }
+        
+        $(
+            impl HasCompStore<$component> for $storage {
+                fn get_mut_components(&mut self) -> &mut froggy::Storage<<$component as traits::CompId>::Type> {
+                    &mut self.$member
+                }
+    
+                fn get_components(&self) -> &froggy::Storage<<$component as traits::CompId>::Type> {
+                    &self.$member
+                }
+            }
+        )*
+    };
+    // Trailing comma alias
+    (
+        $( #[$storage_meta:meta] )*
+        pub struct $storage:ident {
+            $(
+                $member:ident : $component:ident,
+            )*
+        }
+    ) => {
+        component_storage! {
+            $( #[$storage_meta] )*
+            pub struct $storage {
+                $(
+                    $member : $component
+                ),*
+            }
+        }
+    }
+}
