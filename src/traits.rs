@@ -43,6 +43,23 @@ pub trait HasComp<C: CompId> {
     fn get(&self) -> &StorageRc<C::Type>;
 }
 
+/// Signifies that the entity has the given process.
+/// 
+/// Used in the macros to improve error messages when an entity is declared to have
+/// the same process twice.
+pub trait EntityHasProc<P: ProcId> : EntityId {}
+
+/// Signifies that the entity has the given component.
+/// 
+/// Used in the macros to improve error messages when an entity is declared to have
+/// the same component twice.
+pub trait EntityHasComp<C: CompId> : EntityId {}
+
+/// Signifies that the process has an argument of the given type.
+/// 
+/// Used in the macros to statically disallow accessing the same component twice.
+pub trait HasArg<C: CompId>: ProcId {}
+
 /// Signifies that the object contains a storage for arguments to the
 /// identified process. (A list of entity components).
 pub trait HasProcStore<P: ProcId> {

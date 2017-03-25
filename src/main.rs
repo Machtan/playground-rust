@@ -52,13 +52,13 @@ process! {
 // ============= Entities ================
 
 entity! {
-    /// The avatar that the player controls in the game.
     pub mod player {
-        components: {
+        /// The avatar that the player controls in the game.
+        pub struct EPlayer {
             name: CName, 
             age: CAge,
         }
-        processes: {
+        impl {
             PPrintInfo,
             PDoubleAge,
         }
@@ -117,8 +117,8 @@ impl HasProcStore<PDoubleAge> for Sim {
     }
 }
 
-impl HasEntityStore<player::Id> for Sim {
-    fn get_mut_entities(&mut self) -> &mut Vec<<player::Id as EntityId>::Data> {
+impl HasEntityStore<EPlayer> for Sim {
+    fn get_mut_entities(&mut self) -> &mut Vec<<EPlayer as EntityId>::Data> {
         &mut self.entities.players
     }
 }

@@ -49,19 +49,13 @@ macro_rules! process {
             use super::traits;
             use super::froggy;
             use std::fmt::Debug;
-            $(
-                use super::$mut_comp;
-            )*
-            $(
-                use super::$comp;
-            )*
             
             // Empty tuple if no components specified
             
             /// Indices to arguments of this process.
             pub type ArgRefs = (
-                $( froggy::StorageRc<<$mut_comp as traits::CompId>::Type>, )*
-                $( froggy::StorageRc<<$comp as traits::CompId>::Type>, )* 
+                $( froggy::StorageRc<<super::$mut_comp as traits::CompId>::Type>, )*
+                $( froggy::StorageRc<<super::$comp as traits::CompId>::Type>, )* 
             );
             
             // Arguments to this function
@@ -76,26 +70,35 @@ macro_rules! process {
             
             unsafe impl<T> traits::HasProc<self::$proc_id> for T 
               where T: traits::HasProcStore<self::$proc_id>
-                  $( + traits::HasCompStore<$mut_comp> )*
-                  $( + traits::HasCompStore<$comp> )*
+                  $( + traits::HasCompStore<super::$mut_comp> )*
+                  $( + traits::HasCompStore<super::$comp> )*
             {}
+            
+            // Ensure that arguments are only accessed once by this process.
+            $(
+                impl traits::HasArg<super::$mut_comp> for $proc_id {}
+            )*
+            $(
+                impl traits::HasArg<super::$comp> for $proc_id {}
+            )*
+            
             
             impl $proc_id {
                 $( #[$run_meta] )*
                 pub fn run<S>(sim: &mut S $(, $ext_arg : $ext_ty )* )
                   where S: traits::HasProc<self::$proc_id> 
                          + traits::HasProcStore<self::$proc_id>
-                      $( + traits::HasCompStore<$mut_comp> )*
-                      $( + traits::HasCompStore<$comp> )*
+                      $( + traits::HasCompStore<super::$mut_comp> )*
+                      $( + traits::HasCompStore<super::$comp> )*
                 {
                     $(  
                         let mut $mut_arg = unsafe {
-                            &mut * <S as traits::HasCompStore<$mut_comp>>::get_mut_components(sim)
+                            &mut * <S as traits::HasCompStore<super::$mut_comp>>::get_mut_components(sim)
                         }.write();
                     )*
                     $(
                         let $arg = unsafe {
-                            & * <S as traits::HasCompStore<$comp>>::get_components(sim)
+                            & * <S as traits::HasCompStore<super::$comp>>::get_components(sim)
                         }.read();
                     )*
                     
@@ -116,13 +119,13 @@ macro_rules! process {
             // Could as well be a useless blanket implemented trait.
             impl<T> traits::IntoProcArgs<self::$proc_id> for T
               where T: Debug 
-                       $( + traits::HasComp<$mut_comp> )*
-                       $( + traits::HasComp<$comp> )*
+                       $( + traits::HasComp<super::$mut_comp> )*
+                       $( + traits::HasComp<super::$comp> )*
             {
                 fn into_args(&self) -> self::ArgRefs {
                     (
-                        $(<T as traits::HasComp<$mut_comp>>::get(self).clone() , )* 
-                        $(<T as traits::HasComp<$comp>>::get(self).clone() , )*
+                        $(<T as traits::HasComp<super::$mut_comp>>::get(self).clone() , )* 
+                        $(<T as traits::HasComp<super::$comp>>::get(self).clone() , )*
                     )
                 }
             }
@@ -162,40 +165,44 @@ macro_rules! process {
 #[macro_export]
 macro_rules! entity {
     (
-        $( #[ $mod_meta:meta ] )*
+        $( #[$mod_meta:meta] )*
         pub mod $entity:ident {
-            components: {
+            $( #[ $entity_meta:meta ] )*
+            pub struct $entity_id:ident {
                 $(
                     $comp_name:ident : $comp_id:ident,
                 )*
             }
-            processes: {
+            
+            impl {
                 $( $proc_id:ident, )*
             }
         }
     ) => {
-        $( #[ $mod_meta ] )*
+        $( #[$mod_meta] )*
         /// Entity declaration `[macro-generated]`.
         pub mod $entity {
             use super::traits;
             use super::froggy;
-            $(
-                use super::$comp_id;
-            )*
-            $(
-                use super::$proc_id;
-            )*
         
             /// The data that should be stored about this entity to keep it alive.
-            pub type ProcData = ( $( froggy::StorageRc<<$proc_id as traits::ProcId>::ArgRefs> ),* ,);
+            pub type ProcData = ( $( froggy::StorageRc<<super::$proc_id as traits::ProcId>::ArgRefs> ),* ,);
         
-            /// The identifier for this entity.
+            $( #[ $entity_meta ] )*
             #[derive(Debug, Clone, Copy)]
-            pub struct Id;
+            pub struct $entity_id;
         
-            impl traits::EntityId for self::Id {
+            impl traits::EntityId for self::$entity_id {
                 type Data = self::ProcData;
             }
+            
+            // Enforce bounds, woo
+            $(
+                impl traits::EntityHasComp<super::$comp_id> for self::$entity_id {}
+            )*
+            $(
+                impl traits::EntityHasProc<super::$proc_id>for self::$entity_id {}
+            )*
         
             // Create the data used to add the item.
             /// Data used to add this entity to a simulation.
@@ -203,32 +210,32 @@ macro_rules! entity {
             pub struct Data {
                 $(
                     /// A component.
-                    pub $comp_name : <$comp_id as traits::CompId>::Type,
+                    pub $comp_name : <super::$comp_id as traits::CompId>::Type,
                 )*
             }
         
             impl Data {
                 /// Creates a new set of entity data.
-                pub fn new( $( $comp_name : <$comp_id as traits::CompId>::Type ),* ) -> Data {
+                pub fn new( $( $comp_name : <super::$comp_id as traits::CompId>::Type ),* ) -> Data {
                     Data {
                         $( $comp_name ),*
                     }
                 }
             }
         
-            unsafe impl<S> traits::AddEntityToStore<self::Id, S> for self::Data 
-              where S: traits::HasEntityStore<self::Id>
+            unsafe impl<S> traits::AddEntityToStore<self::$entity_id, S> for self::Data 
+              where S: traits::HasEntityStore<self::$entity_id>
                     $(
-                        + traits::HasCompStore<$comp_id>
+                        + traits::HasCompStore<super::$comp_id>
                     )*
                     $(
-                        + traits::HasProc<$proc_id>
+                        + traits::HasProc<super::$proc_id>
                     )*
             {
                 fn add_to(self, sim: &mut S) {
                     $(
                         let $comp_name = unsafe {
-                            &mut * <S as traits::HasCompStore<$comp_id>>::get_mut_components(sim)
+                            &mut * <S as traits::HasCompStore<super::$comp_id>>::get_mut_components(sim)
                         }.write().insert(self.$comp_name);
                     )*
                     let components = CompRefs {
@@ -237,9 +244,9 @@ macro_rules! entity {
                         ),*
                     };
                     let entity = ( $(
-                        <S as traits::HasProc<$proc_id>>::add_to_process(sim, components.clone() )
+                        <S as traits::HasProc<super::$proc_id>>::add_to_process(sim, components.clone() )
                     ),* ,);
-                    <S as traits::HasEntityStore<self::Id>>::get_mut_entities(sim).push(entity);
+                    <S as traits::HasEntityStore<self::$entity_id>>::get_mut_entities(sim).push(entity);
                 }
             }
         
@@ -252,18 +259,21 @@ macro_rules! entity {
             pub struct CompRefs {
                 $(
                     /// A component.
-                    pub $comp_name : froggy::StorageRc<<$comp_id as traits::CompId>::Type>,
+                    pub $comp_name : froggy::StorageRc<<super::$comp_id as traits::CompId>::Type>,
                 )*
             }
         
             $(
-                impl traits::HasComp<$comp_id> for self::CompRefs {
-                    fn get(&self) -> &froggy::StorageRc<<$comp_id as traits::CompId>::Type> {
+                impl traits::HasComp<super::$comp_id> for self::CompRefs {
+                    fn get(&self) -> &froggy::StorageRc<<super::$comp_id as traits::CompId>::Type> {
                         &self.$comp_name
                     }
                 }
             )*
         }
+        
+        // Export the identifier.
+        pub use $entity::$entity_id;
     }
 }
 
