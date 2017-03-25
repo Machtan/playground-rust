@@ -89,10 +89,14 @@ macro_rules! process {
                       $( + traits::HasCompStore<$comp> )*
                 {
                     $(  
-                        let mut $mut_arg = <S as traits::HasCompStore<$mut_comp>>::get_mut_components(sim).write();
+                        let mut $mut_arg = unsafe {
+                            &mut * <S as traits::HasCompStore<$mut_comp>>::get_mut_components(sim)
+                        }.write();
                     )*
                     $(
-                        let $arg = <S as traits::HasCompStore<$comp>>::get_components(sim).read();
+                        let $arg = unsafe {
+                            & * <S as traits::HasCompStore<$comp>>::get_components(sim)
+                        }.read();
                     )*
                     
                     for &( $( ref $mut_gensym, )* $( ref $gensym, )* )
@@ -223,7 +227,9 @@ macro_rules! entity {
             {
                 fn add_to(self, sim: &mut S) {
                     $(
-                        let $comp_name = <S as traits::HasCompStore<$comp_id>>::get_mut_components(sim).write().insert(self.$comp_name);
+                        let $comp_name = unsafe {
+                            &mut * <S as traits::HasCompStore<$comp_id>>::get_mut_components(sim)
+                        }.write().insert(self.$comp_name);
                     )*
                     let components = CompRefs {
                         $(
@@ -283,12 +289,12 @@ macro_rules! component_storage {
         }
         
         $(
-            impl HasCompStore<$component> for $storage {
-                fn get_mut_components(&mut self) -> &mut froggy::Storage<<$component as traits::CompId>::Type> {
+            unsafe impl traits::HasCompStore<$component> for $storage {
+                fn get_mut_components(&mut self) -> *mut froggy::Storage<<$component as traits::CompId>::Type> {
                     &mut self.$member
                 }
     
-                fn get_components(&self) -> &froggy::Storage<<$component as traits::CompId>::Type> {
+                fn get_components(&self) -> *const froggy::Storage<<$component as traits::CompId>::Type> {
                     &self.$member
                 }
             }
@@ -319,14 +325,14 @@ macro_rules! component_storage {
 #[macro_export]
 macro_rules! contains_components {
     (
-        $type:ty => $member:ident: $comp_type:ty
+        $type:ident.$member:ident: $comp_type:ty
     ) => {
-        impl<C> traits::HasCompStore<C> for $type where C: traits::CompId, $comp_type: HasCompStore<C> {
-            fn get_mut_components(&mut self) -> &mut froggy::Storage<<C as traits::CompId>::Type> {
+        unsafe impl<C> traits::HasCompStore<C> for $type where C: traits::CompId, $comp_type: HasCompStore<C> {
+            fn get_mut_components(&mut self) -> *mut froggy::Storage<<C as traits::CompId>::Type> {
                 self.$member.get_mut_components()
             }
 
-            fn get_components(&self) -> &froggy::Storage<<C as traits::CompId>::Type> {
+            fn get_components(&self) -> *const froggy::Storage<<C as traits::CompId>::Type> {
                 self.$member.get_components()
             }
         }

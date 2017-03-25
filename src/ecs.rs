@@ -25,6 +25,10 @@ component_storage! {
     }
 }
 
+contains_components! {
+    Sim.components: Components
+}
+
 // ============= Processes ================
 
 process! {

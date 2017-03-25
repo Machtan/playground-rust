@@ -83,14 +83,17 @@ pub unsafe trait HasProc<P: ProcId> : HasProcStore<P> {
 }
 
 /// Signifies that the object contains a storage for components of the identified type.
-pub trait HasCompStore<C: CompId> {
+/// The reason why this trait is unsafe to implement, is that all component stores
+/// on an object must be disjoint, in order to not violate aliasing rules in the
+/// case that the user wants to modify the stores for two or more components through a process.
+pub unsafe trait HasCompStore<C: CompId> {
     /// Returns a mutable reference to the component store.
     #[inline]
-    fn get_mut_components(&mut self) -> &mut Storage<C::Type>;
+    fn get_mut_components(&mut self) -> *mut Storage<C::Type>;
     
     /// Returns an immutable reference to the component store.
     #[inline]
-    fn get_components(&self) -> &Storage<C::Type>;
+    fn get_components(&self) -> *const Storage<C::Type>;
 }
 
 /// Signifies that the object contains a storage for entities of the identified type.
