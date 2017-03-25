@@ -49,6 +49,17 @@ process! {
     }
 }
 
+process_storage! {
+    pub struct Processes {
+        print_info: PPrintInfo,
+        double_age: PDoubleAge,
+    }
+}
+
+contains_processes! {
+    Sim.processes: Processes
+}
+
 // ============= Entities ================
 
 entity! {
@@ -65,17 +76,11 @@ entity! {
     }
 }
 
-// ====== SIM data ====== 
+// ====== SIM data ======
 
 #[derive(Debug, Default)]
 struct Entities {
     players: Vec<player::ProcData>,
-}
-
-#[derive(Debug, Default)]
-struct Processes {
-    print_info: Storage<print_info::ArgRefs>,
-    double_age: Storage<double_age::ArgRefs>,
 }
 
 #[derive(Debug, Default)]
@@ -93,27 +98,6 @@ impl Sim {
     pub fn update(&mut self) {
         PPrintInfo::run(self);
         PDoubleAge::run(self);
-    }
-}
-
-
-impl HasProcStore<PPrintInfo> for Sim {
-    fn process_members_mut(&mut self) -> &mut Storage<print_info::ArgRefs> {
-        &mut self.processes.print_info
-    }
-    
-    fn process_members(&self) -> &Storage<print_info::ArgRefs> {
-        &self.processes.print_info
-    }
-}
-
-impl HasProcStore<PDoubleAge> for Sim {
-    fn process_members_mut(&mut self) -> &mut Storage<double_age::ArgRefs> {
-        &mut self.processes.double_age
-    }
-    
-    fn process_members(&self) -> &Storage<double_age::ArgRefs> {
-        &self.processes.double_age
     }
 }
 

@@ -289,6 +289,7 @@ macro_rules! component_storage {
             ),*
         }
     ) => {
+        /// A storage type for components in an ECS system.
         $( #[ $storage_meta ] )*
         #[derive(Debug, Default)]
         pub struct $storage {
@@ -330,6 +331,58 @@ macro_rules! component_storage {
     }
 }
 
+#[macro_export]
+macro_rules! process_storage {
+    (
+        $( #[ $storage_meta:meta ] )*
+        pub struct $storage:ident {
+            $(
+                $member:ident : $proc_id:ty
+            ),*
+        }
+    ) => {
+        /// A storage type for arguments to an ECS process.
+        $( #[ $storage_meta ] )*
+        #[derive(Debug, Default)]
+        pub struct $storage {
+            $(
+                /// A process [macro-generated].
+                pub $member : froggy::Storage<<$proc_id as traits::ProcId>::ArgRefs>
+            ),*
+        }
+        
+        $(
+            impl traits::HasProcStore<$proc_id> for $storage {
+                fn process_members_mut(&mut self) -> &mut Storage<<$proc_id as traits::ProcId>::ArgRefs> {
+                    &mut self.$member
+                }
+    
+                fn process_members(&self) -> &Storage<<$proc_id as traits::ProcId>::ArgRefs> {
+                    &self.$member
+                }
+            } 
+        )*
+    };
+    // Trailing comma alias
+    (
+        $( #[$storage_meta:meta] )*
+        pub struct $storage:ident {
+            $(
+                $member:ident : $proc_id:ident,
+            )*
+        }
+    ) => {
+        process_storage! {
+            $( #[$storage_meta] )*
+            pub struct $storage {
+                $(
+                    $member : $proc_id
+                ),*
+            }
+        }
+    };
+}
+
 /// Describes that all components stored by the member of the type is also
 /// stored by the type.
 #[macro_export]
@@ -344,6 +397,28 @@ macro_rules! contains_components {
 
             fn get_components(&self) -> *const froggy::Storage<<C as traits::CompId>::Type> {
                 self.$member.get_components()
+            }
+        }
+    }
+}
+
+/// Describes that all processes stored by the member of the type is also
+/// stored by the type.
+#[macro_export]
+macro_rules! contains_processes {
+    (
+        $type:ident.$member:ident: $proc_type:ty
+    ) => {
+        impl<P> traits::HasProcStore<P> for $type where P: traits::ProcId, $proc_type: HasProcStore<P> {
+            #[inline]
+            fn process_members_mut(&mut self) -> &mut Storage<P::ArgRefs> {
+                self.$member.process_members_mut()
+            }
+    
+            /// Returns an immutable reference to the store of arguments to the process.
+            #[inline]
+            fn process_members(&self) -> & Storage<P::ArgRefs> {
+                self.$member.process_members()
             }
         }
     }
