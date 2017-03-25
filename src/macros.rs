@@ -3,8 +3,11 @@ extern crate froggy;
 /// Declares a component with the given name and type.
 #[macro_export]
 macro_rules! component {
-    ( $name:ident : $type:ty) => {
-        /// A component.
+    ( 
+        $( #[$meta:meta] )*
+        pub $name:ident : $type:ty
+    ) => {
+        $( #[$meta] )*
         #[derive(Debug, Clone, Copy)]
         pub struct $name;
         
@@ -27,7 +30,8 @@ macro_rules! process {
     (
         $( #[$meta:meta] )*
         pub mod $mod:ident {
-            $proc_id:ident::run( 
+            $( #[$run_meta:meta] )*
+            pub fn $proc_id:ident::run( 
                 // Mutable components, always first.
                 $( mut $mut_arg:ident[$mut_gensym:ident] : &mut $mut_comp:ident, )*
                 
@@ -40,6 +44,7 @@ macro_rules! process {
         }
     ) => {
         $( #[$meta] )*
+        /// Process definition `[macro-generated]`.
         pub mod $mod {
             use super::traits;
             use super::froggy;
@@ -51,8 +56,13 @@ macro_rules! process {
                 use super::$comp;
             )*
             
+            // Empty tuple if no components specified
+            
             /// Indices to arguments of this process.
-            pub type ArgRefs = ( $( froggy::StorageRc<<$comp as traits::CompId>::Type> ),* );
+            pub type ArgRefs = (
+                $( froggy::StorageRc<<$mut_comp as traits::CompId>::Type>, )*
+                $( froggy::StorageRc<<$comp as traits::CompId>::Type>, )* 
+            );
             
             // Arguments to this function
             // pub type Args = ( $( &mut $mut_comp, )* $( &$comp, )* );
@@ -71,6 +81,7 @@ macro_rules! process {
             {}
             
             impl $proc_id {
+                $( #[$run_meta] )*
                 pub fn run<S>(sim: &mut S $(, $ext_arg : $ext_ty )* )
                   where S: traits::HasProc<self::$proc_id> 
                          + traits::HasProcStore<self::$proc_id>
@@ -155,99 +166,98 @@ macro_rules! entity {
                 )*
             }
             processes: {
-                $( $proc_id:ident ),*
+                $( $proc_id:ident, )*
             }
         }
     ) => {
-    $( #[ $mod_meta ] )*
-    pub mod $entity {
-        use super::traits;
-        use super::froggy;
-        $(
-            use super::$comp_id;
-        )*
-        $(
-            use super::$proc_id;
-        )*
-        
-        /// The data that should be stored about this entity to keep it alive.
-        pub type ProcData = ( $( froggy::StorageRc<<$proc_id as traits::ProcId>::ArgRefs> ),* ,);
-        
-        // Create an Id struct
-        /// The identifier for an entity.
-        #[derive(Debug, Clone, Copy)]
-        pub struct Id;
-        
-        impl traits::EntityId for self::Id {
-            type Data = self::ProcData;
-        }
-        
-        // Create the data used to add the item.
-        /// Entity creation data.
-        #[derive(Debug)]
-        pub struct Data {
+        $( #[ $mod_meta ] )*
+        /// Entity declaration `[macro-generated]`.
+        pub mod $entity {
+            use super::traits;
+            use super::froggy;
             $(
-                /// A component.
-                pub $comp_name : <$comp_id as traits::CompId>::Type,
+                use super::$comp_id;
             )*
-        }
+            $(
+                use super::$proc_id;
+            )*
         
-        impl Data {
-            /// Creates a new set of entity data.
-            pub fn new( $( $comp_name : <$comp_id as traits::CompId>::Type ),* ) -> Data {
-                Data {
-                    $( $comp_name ),*
+            /// The data that should be stored about this entity to keep it alive.
+            pub type ProcData = ( $( froggy::StorageRc<<$proc_id as traits::ProcId>::ArgRefs> ),* ,);
+        
+            /// The identifier for this entity.
+            #[derive(Debug, Clone, Copy)]
+            pub struct Id;
+        
+            impl traits::EntityId for self::Id {
+                type Data = self::ProcData;
+            }
+        
+            // Create the data used to add the item.
+            /// Data used to add this entity to a simulation.
+            #[derive(Debug)]
+            pub struct Data {
+                $(
+                    /// A component.
+                    pub $comp_name : <$comp_id as traits::CompId>::Type,
+                )*
+            }
+        
+            impl Data {
+                /// Creates a new set of entity data.
+                pub fn new( $( $comp_name : <$comp_id as traits::CompId>::Type ),* ) -> Data {
+                    Data {
+                        $( $comp_name ),*
+                    }
                 }
             }
-        }
         
-        unsafe impl<S> traits::AddEntityToStore<self::Id, S> for self::Data 
-          where S: traits::HasEntityStore<self::Id>
-                $(
-                    + traits::HasCompStore<$comp_id>
-                )*
-                $(
-                    + traits::HasProc<$proc_id>
-                )*
-        {
-            fn add_to(self, sim: &mut S) {
-                $(
-                    let $comp_name = <S as traits::HasCompStore<$comp_id>>::get_mut_components(sim).write().insert(self.$comp_name);
-                )*
-                let components = CompRefs {
+            unsafe impl<S> traits::AddEntityToStore<self::Id, S> for self::Data 
+              where S: traits::HasEntityStore<self::Id>
                     $(
-                        $comp_name
-                    ),*
-                };
-                let entity = ( $(
-                    <S as traits::HasProc<$proc_id>>::add_to_process(sim, components.clone() )
-                ),* ,);
-                <S as traits::HasEntityStore<self::Id>>::get_mut_entities(sim).push(entity);
-            }
-        }
-        
-        // Ensure that the entity can be added to processes
-        /// A struct holding references to the components of this entity inside
-        /// a store. 
-        /// 
-        /// Used internally to access the right components to get the arguments
-        /// for a process when adding the entity to it.
-        #[derive(Debug, Clone)]
-        pub struct CompRefs {
-            $(
-                /// A component.
-                pub $comp_name : froggy::StorageRc<<$comp_id as traits::CompId>::Type>,
-            )*
-        }
-        
-        $(
-            impl traits::HasComp<$comp_id> for self::CompRefs {
-                fn get(&self) -> &froggy::StorageRc<<$comp_id as traits::CompId>::Type> {
-                    &self.$comp_name
+                        + traits::HasCompStore<$comp_id>
+                    )*
+                    $(
+                        + traits::HasProc<$proc_id>
+                    )*
+            {
+                fn add_to(self, sim: &mut S) {
+                    $(
+                        let $comp_name = <S as traits::HasCompStore<$comp_id>>::get_mut_components(sim).write().insert(self.$comp_name);
+                    )*
+                    let components = CompRefs {
+                        $(
+                            $comp_name
+                        ),*
+                    };
+                    let entity = ( $(
+                        <S as traits::HasProc<$proc_id>>::add_to_process(sim, components.clone() )
+                    ),* ,);
+                    <S as traits::HasEntityStore<self::Id>>::get_mut_entities(sim).push(entity);
                 }
             }
-        )*
-    }
+        
+            /// A struct holding references to the components of this entity inside
+            /// a store. 
+            /// 
+            /// Used internally to access the right components to get the arguments
+            /// for a process when adding the entity to it.
+            #[derive(Debug, Clone)]
+            pub struct CompRefs {
+                $(
+                    /// A component.
+                    pub $comp_name : froggy::StorageRc<<$comp_id as traits::CompId>::Type>,
+                )*
+            }
+        
+            $(
+                impl traits::HasComp<$comp_id> for self::CompRefs {
+                    fn get(&self) -> &froggy::StorageRc<<$comp_id as traits::CompId>::Type> {
+                        &self.$comp_name
+                    }
+                }
+            )*
+        }
     }
 }
 

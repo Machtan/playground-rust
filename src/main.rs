@@ -7,36 +7,15 @@ pub mod macros;
 use traits::{EntityId, HasCompStore, HasProcStore, HasEntityStore, AddEntityToStore};
 use froggy::{Storage};
 
-process! {
-    pub mod print_info {
-        PPrintInfo::run(ref name[n]: &CName, ref age[a]: &CAge,) { 
-            println!("{} is {} year(s) old", name, age); 
-        }
-    }
+// ============ Components =============
+component! { 
+    /// The name of an entity.
+    pub CName: String
 }
-
-/*pub type PrintInfoArgs = (StorageRc<String>, StorageRc<u32>);
-
-impl<T> IntoProcArgs<PrintInfoProc> for T where T: HasComp<CName> + HasComp<CAge> {
-    fn into_args(&self) -> PrintInfoArgs {
-        (<T as HasComp<CName>>::get(self).clone(), <T as HasComp<CAge>>::get(self).clone())
-    }
+component! {
+    /// The age of an entity.
+    pub CAge: u32
 }
-
-unsafe impl<T> HasProc<PrintInfoProc> for T 
-  where T: HasProcStore<PrintInfoProc>
-         + HasCompStore<CName>
-         + HasCompStore<CAge> 
-{}
-
-pub struct PrintInfoProc;
-impl ProcId for PrintInfoProc {
-    type ArgRefs = PrintInfoArgs;
-}*/
-
-// ====== Component definitions ======
-component! { CName: String }
-component! { CAge: u32 }
 
 component_storage! {
     /// Stores all the components!
@@ -46,11 +25,27 @@ component_storage! {
     }
 }
 
-contains_components! {
-    Sim => components: Components
+// ============= Processes ================
+
+process! {
+    pub mod print_info {
+        /// Prints info about an entity.
+        pub fn PPrintInfo::run(ref name[n]: &CName, ref age[a]: &CAge,) { 
+            println!("{} is {} year(s) old", name, age); 
+        }
+    }
 }
 
-// ============= Macros ================
+process! {
+    pub mod double_age {
+        /// Doubles the age of an entity.
+        pub fn PDoubleAge::run(mut age[a]: &mut CAge,) {
+            *age *= 2;
+        }
+    }
+}
+
+// ============= Entities ================
 
 entity! {
     /// The avatar that the player controls in the game.
@@ -60,12 +55,11 @@ entity! {
             age: CAge,
         }
         processes: {
-            PPrintInfo
+            PPrintInfo,
+            PDoubleAge,
         }
     }
 }
-
-// ======= Processes =========
 
 // ====== SIM data ====== 
 
@@ -77,6 +71,7 @@ struct Entities {
 #[derive(Debug, Default)]
 struct Processes {
     print_info: Storage<print_info::ArgRefs>,
+    double_age: Storage<double_age::ArgRefs>,
 }
 
 #[derive(Debug, Default)]
@@ -93,6 +88,7 @@ impl Sim {
     
     pub fn update(&mut self) {
         PPrintInfo::run(self);
+        PDoubleAge::run(self);
     }
 }
 
@@ -104,6 +100,16 @@ impl HasProcStore<PPrintInfo> for Sim {
     
     fn process_members(&self) -> &Storage<print_info::ArgRefs> {
         &self.processes.print_info
+    }
+}
+
+impl HasProcStore<PDoubleAge> for Sim {
+    fn process_members_mut(&mut self) -> &mut Storage<double_age::ArgRefs> {
+        &mut self.processes.double_age
+    }
+    
+    fn process_members(&self) -> &Storage<double_age::ArgRefs> {
+        &self.processes.double_age
     }
 }
 
@@ -136,5 +142,6 @@ fn main() {
     //println!("print_info: {:?}", sim.processes.print_info);
     //println!("players:    {:?}", sim.entities.players);
     
+    sim.update();
     sim.update();
 }
