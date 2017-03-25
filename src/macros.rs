@@ -331,8 +331,10 @@ macro_rules! component_storage {
     }
 }
 
+/// Declares a storage stype for process arguments (members).
 #[macro_export]
 macro_rules! process_storage {
+    // No trailing commas
     (
         $( #[ $storage_meta:meta ] )*
         pub struct $storage:ident {
@@ -383,6 +385,56 @@ macro_rules! process_storage {
     };
 }
 
+/// Declares a storage stype for entities.
+#[macro_export]
+macro_rules! entity_storage {
+    // No trailing commas
+    (
+        $( #[ $storage_meta:meta ] )*
+        pub struct $storage:ident {
+            $(
+                $member:ident : $mem_id:ty
+            ),*
+        }
+    ) => {
+        /// A storage type for entities in an ECS system.
+        $( #[ $storage_meta ] )*
+        #[derive(Debug, Default)]
+        pub struct $storage {
+            $(
+                /// A process [macro-generated].
+                pub $member : Vec<<$mem_id as traits::EntityId>::Data>
+            ),*
+        }
+        
+        $(
+            impl traits::HasEntityStore<$mem_id> for $storage {
+                fn get_mut_entities(&mut self) -> &mut Vec<<$mem_id as traits::EntityId>::Data> {
+                    &mut self.$member
+                }
+            }
+        )*
+    };
+    // Trailing comma alias
+    (
+        $( #[$storage_meta:meta] )*
+        pub struct $storage:ident {
+            $(
+                $member:ident : $mem_id:ident,
+            )*
+        }
+    ) => {
+        entity_storage! {
+            $( #[$storage_meta] )*
+            pub struct $storage {
+                $(
+                    $member : $mem_id
+                ),*
+            }
+        }
+    };
+}
+
 /// Describes that all components stored by the member of the type is also
 /// stored by the type.
 #[macro_export]
@@ -410,15 +462,28 @@ macro_rules! contains_processes {
         $type:ident.$member:ident: $proc_type:ty
     ) => {
         impl<P> traits::HasProcStore<P> for $type where P: traits::ProcId, $proc_type: HasProcStore<P> {
-            #[inline]
             fn process_members_mut(&mut self) -> &mut Storage<P::ArgRefs> {
                 self.$member.process_members_mut()
             }
     
             /// Returns an immutable reference to the store of arguments to the process.
-            #[inline]
             fn process_members(&self) -> & Storage<P::ArgRefs> {
                 self.$member.process_members()
+            }
+        }
+    }
+}
+
+/// Describes that all entities stored by the member of the type is also
+/// stored by the type.
+#[macro_export]
+macro_rules! contains_entities {
+    (
+        $type:ident.$member:ident: $store:ty
+    ) => {
+        impl<E> traits::HasEntityStore<E> for $type where E: traits::EntityId, $store: HasEntityStore<E> {
+            fn get_mut_entities(&mut self) -> &mut Vec<<E as EntityId>::Data> {
+                self.$member.get_mut_entities()
             }
         }
     }

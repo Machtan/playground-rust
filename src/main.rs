@@ -25,10 +25,6 @@ component_storage! {
     }
 }
 
-contains_components! {
-    Sim.components: Components
-}
-
 // ============= Processes ================
 
 process! {
@@ -56,10 +52,6 @@ process_storage! {
     }
 }
 
-contains_processes! {
-    Sim.processes: Processes
-}
-
 // ============= Entities ================
 
 entity! {
@@ -76,12 +68,13 @@ entity! {
     }
 }
 
-// ====== SIM data ======
-
-#[derive(Debug, Default)]
-struct Entities {
-    players: Vec<player::ProcData>,
+entity_storage! {
+    pub struct Entities {
+        player: EPlayer,
+    }
 }
+
+// ====== SIM data ======
 
 #[derive(Debug, Default)]
 pub struct Sim {
@@ -101,10 +94,16 @@ impl Sim {
     }
 }
 
-impl HasEntityStore<EPlayer> for Sim {
-    fn get_mut_entities(&mut self) -> &mut Vec<<EPlayer as EntityId>::Data> {
-        &mut self.entities.players
-    }
+contains_processes! {
+    Sim.processes: Processes
+}
+
+contains_components! {
+    Sim.components: Components
+}
+
+contains_entities! {
+    Sim.entities: Entities
 }
 
 fn main() {
