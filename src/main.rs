@@ -45,10 +45,20 @@ process! {
     }
 }
 
+process! {
+    pub mod print_with_last_name {
+        /// Prints the name of the entity with an added last name.
+        pub fn PPrintWithLastName::run(ref name[n]: &CName, ext last_name: &str,) {
+            println!("Name: {} {}", name, last_name);
+        }
+    }
+}
+
 process_storage! {
     pub struct Processes {
         print_info: PPrintInfo,
         double_age: PDoubleAge,
+        pwln: PPrintWithLastName,
     }
 }
 
@@ -64,6 +74,7 @@ entity! {
         impl {
             PPrintInfo,
             PDoubleAge,
+            PPrintWithLastName,
         }
     }
 }
@@ -91,6 +102,7 @@ impl Sim {
     pub fn update(&mut self) {
         PPrintInfo::run(self);
         PDoubleAge::run(self);
+        PPrintWithLastName::run(self, "Erroinen");
     }
 }
 
