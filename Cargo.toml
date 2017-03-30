@@ -5,3 +5,5 @@ authors = ["Machtan <jako3047@gmail.com>"]
 
 [dependencies]
 froggy = { path = "../../foreign/froggy" }
+complecs = { path = "../complecs" }
+#error_chain = "0.10"
