@@ -3,6 +3,9 @@ name = "playground"
 version = "0.1.0"
 authors = ["Machtan <jako3047@gmail.com>"]
 
+[lib]
+path = "src/lib.rs"
+
 [dependencies]
 froggy = { path = "../../foreign/froggy" }
 complecs = { path = "../complecs" }

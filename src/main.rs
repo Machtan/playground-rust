@@ -1,70 +1,9 @@
-/*!
-A simple argument parsing library.
+extern crate playground;
 
-# Lifetimes
-`'def`: `argument definition`
-
-The lifetime of argument definition passed to `parse`
-
-
-`'tar`: `target`
-
-The lifetime of target pointers used when defining arguments.
-*/
-
-#![feature(unicode)]
-extern crate std_unicode;
-
-mod argdef;
-mod help;
-mod parse;
-
-use std::borrow::{Cow};
 use std::env;
 use std::iter;
+use playground::{ArgDef, parse, ParseStatus, default_help_interrupt, default_version_interrupt};
 
-use argdef::{ArgDef};
-use parse::{parse, ParseStatus};
-
-/*
-DESIGN: Do I wait with assigning values until all arguments have been 'satisfied'?
-Or do I just start parsing/assigning as soon as possible so that bad arguments
-are caught faster?
-For now it'll be 2, since that seems simpler
-
-# option 1
-read through the arguments and assign each to a matching option
-if an interrupt is encountered: 
-    run the callback and return the interrupt
-validate each argument (add 'validate' to the interface)
-go through and parse every value into its target
-return success
-*/
-
-/// Creates a default help interrupt for `--help`.
-pub fn default_help_interrupt<'def, 'tar, D>(description: D)
-        -> ArgDef<'def, 'tar> 
-  where D: Into<Cow<'static, str>>
-{
-    let description = description.into();
-    ArgDef::interrupt("help", move |help| {
-        help.print_help(description.as_ref());
-    }).help("Print this message and abort.")
-}
-
-/// Creates a default version interrupt for `--version`.
-pub fn default_version_interrupt<'def, 'tar>() -> ArgDef<'def, 'tar> {
-    ArgDef::interrupt("version", |_| {
-        println!("{}", option_env!("CARGO_PKG_VERSION").unwrap_or("0.0.0"));
-    }).help("Print version string and abort.")
-}
-
-/*
-Tasks
-- DONE Usage generator (printer)
-- DONE Help generator (printer)
-- Simple subcommand abstraction
-*/
 fn main() {
     let args = env::args().skip(1).collect::<Vec<_>>();
     
