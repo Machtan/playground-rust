@@ -1,8 +1,23 @@
 use std::borrow::Cow;
 use argdef::{ArgDef, ArgDefKind};
 use std_unicode::str::UnicodeStr;
-use std::env;
-use std::path::Path;
+
+pub fn trim_and_strip_lines<'a>(text: &'a str) -> impl Iterator<Item=&'a str> {
+    let rev: Vec<_> = text.lines()
+        .rev().skip_while(|&l| l == "" || l.is_whitespace()).collect();
+    rev.into_iter()
+        .rev().skip_while(|&l| l == "" || l.is_whitespace())
+        .map(|line| line.trim())
+}
+
+fn write_trimmed_n<'def, T: AsRef<str>>(s: &mut String, prefix: &str, text: T) {
+    for line in trim_and_strip_lines(text.as_ref()) {
+        s.push_str(prefix);
+        s.push_str(line);
+        s.push('\n')
+    }
+}
+
 
 /// A collection of descriptions of the defined arguments.
 #[derive(Debug)]
@@ -11,6 +26,8 @@ pub struct Help<'def> {
     pub positional: Vec<(Cow<'def, str>, Option<Cow<'def, str>>)>,
     /// Trailing positional vararg.
     pub trail: Option<(Cow<'def, str>, bool, Option<Cow<'def, str>>)>,
+    /// Subcommand arguments.
+    pub subcommands: Vec<(Cow<'def, str>, Option<Cow<'def, str>>)>,
     /// Optional arguments.
     pub options: Vec<(Cow<'def, str>, Option<Cow<'def, str>>, HelpOptKind, Option<Cow<'def, str>>)>,
     /// Is `--help` defined.
@@ -23,6 +40,7 @@ impl<'def> Help<'def> {
         let mut positional = Vec::new();
         let mut trail = None;
         let mut options = Vec::new();
+        let mut subcommands = Vec::new();
         let mut help_defined = false;
         for def in definitions {
             match def.kind {
@@ -32,6 +50,9 @@ impl<'def> Help<'def> {
                 ArgDefKind::Trail { optional, .. } => {
                     trail = Some((def.name.clone(), optional, def.help_desc.clone()));
                 },
+                ArgDefKind::Subcommand { .. } => {
+                    subcommands.push((def.name.clone(), def.help_desc.clone()));
+                }
                 ArgDefKind::Flag { ref short, .. } => {
                     options.push((
                         def.name.clone(), short.clone(), 
@@ -61,17 +82,19 @@ impl<'def> Help<'def> {
                 }
             }
         }
-        Help { positional, trail, options, help_defined }
+        Help { positional, trail, subcommands, options, help_defined }
     }
     
-    fn write_usage_into(&self, s: &mut String) {
-        let bin = env::args().next().unwrap();
-        let bin_name = Path::new(&bin).file_name().unwrap().to_string_lossy();
-        s.push_str(bin_name.as_ref());
+    fn write_usage_into(&self, s: &mut String, progname: &str) {
+        s.push_str(progname);
         
         if ! self.options.is_empty() {
             if self.help_defined {
-                s.push_str(" [ --help | OPTIONS ]");
+                if self.options.len() > 1 { // Not only --help
+                    s.push_str(" [ --help | OPTIONS ]");
+                } else {
+                    s.push_str(" [ --help ]");
+                }
             } else {
                 s.push_str(" [ OPTIONS ]");
             }
@@ -90,46 +113,48 @@ impl<'def> Help<'def> {
                 s.push_str(&format!("{} [{}...]", name, name));
             }
         }
+        
+        if ! self.subcommands.is_empty() {
+            s.push_str(" { ");
+            let last = self.subcommands.len() - 1;
+            for (i, &(ref name, _)) in self.subcommands.iter().enumerate() {
+                s.push_str(name.as_ref());
+                if i != last {
+                    s.push_str(" | ");
+                }
+            }
+            s.push_str(" }");
+        }
     }
     
     /// Generates a usage message for this program.
-    pub fn usage_message(&self) -> String {
+    pub fn usage_message(&self, progname: &str) -> String {
         let mut s = String::new();
-        self.write_usage_into(&mut s);
+        self.write_usage_into(&mut s, progname);
         s
     }
     
     /// Prints a usage message for this program.
-    pub fn print_usage(&self) {
-        println!("Usage: {}", self.usage_message());
+    pub fn print_usage(&self, progname: &str) {
+        println!("Usage: {}", self.usage_message(progname));
     }
     
     /// Generates a help message for this program, using the given program
     /// description. The description may be left blank.
-    pub fn help_message(&self, description: &str) -> String {
+    pub fn help_message(&self, progname: &str, description: &str) -> String {
         let mut s = String::from("Usage:\n  ");
-        self.write_usage_into(&mut s);
+        self.write_usage_into(&mut s, progname);
         
         let has_description = description != "";
         let has_positional = (! self.positional.is_empty()) || self.trail.is_some();
         let has_optional = ! self.options.is_empty();
-        if has_positional || has_optional || has_description {
+        let has_subcommands = ! self.subcommands.is_empty();
+        if has_positional || has_optional || has_description || has_subcommands {
             s.push_str("\n\n");
         }
         
         if has_description {
-            // Trim the description
-            let rev: Vec<_> = description.lines()
-                .rev().skip_while(|&l| l == "" || l.is_whitespace()).collect();
-            let lines = rev.into_iter()
-                .rev().skip_while(|&l| l == "" || l.is_whitespace())
-                .map(|line| line.trim());
-            s.push_str("Description:\n");
-            for line in lines {
-                s.push_str("  ");
-                s.push_str(line.trim());
-                s.push('\n');
-            }
+            write_trimmed_n(&mut s, "  ", description);
         }
         
         if has_positional {
@@ -138,7 +163,7 @@ impl<'def> Help<'def> {
             for &(ref name, ref help) in self.positional.iter() {
                 s.push_str(&format!("  {}\n", name));
                 if let &Some(ref help) = help {
-                    s.push_str(&format!("    {}\n", help));
+                    write_trimmed_n(&mut s, "    ", help);
                 }
                 s.push('\n');
             }
@@ -150,13 +175,26 @@ impl<'def> Help<'def> {
                     s.push_str(&format!("{} [{}...]\n", name, name));
                 }
                 if let &Some(ref help) = help {
-                    s.push_str(&format!("    {}\n", help));
+                    write_trimmed_n(&mut s, "    ", help);
                 }
                 s.push('\n');
             }
         }
+        
+        if has_subcommands {
+            s.push('\n');
+            s.push_str("Subcommands:\n");
+            for &(ref name, ref help) in self.subcommands.iter() {
+                s.push_str(&format!("  {}\n", name));
+                if let &Some(ref help) = help {
+                    write_trimmed_n(&mut s, "    ", help);
+                }
+                s.push('\n');
+            }
+        }
+        
         if has_optional {
-            if ! has_positional {
+            if ! (has_positional || has_subcommands) {
                 s.push('\n');
             }
             s.push_str("Optional arguments:\n");
@@ -178,7 +216,7 @@ impl<'def> Help<'def> {
                 }
                 s.push('\n');
                 if let &Some(ref help) = help {
-                    s.push_str(&format!("      {}\n", help));
+                    write_trimmed_n(&mut s, "      ", help);
                     s.push('\n');
                 }
             }
@@ -189,8 +227,8 @@ impl<'def> Help<'def> {
     
     /// Prints a help message for this program, using the given program
     /// description. The description may be left blank.
-    pub fn print_help(&self, description: &str) {
-        println!("{}", self.help_message(description));
+    pub fn print_help(&self, progname: &str, description: &str) {
+        print!("{}", self.help_message(progname, description));
     }
 }
 

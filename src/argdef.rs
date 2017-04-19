@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use std::borrow::Cow;
 use std::rc::Rc;
 use help::Help;
+use parse::ParseError;
 
 /// Allows every type that is FromStr to be read from an argument.
 pub trait SingleTarget: Debug {
@@ -57,6 +58,8 @@ impl<T> CollectionTarget for Vec<T> where T: Debug + FromStr {
     }
 }
 
+pub type SubCmd<'def> = Box<FnMut(&[&str]) -> Result<(), ParseError<'def>>>;
+
 /// The description of an expected argument.
 //#[derive(Debug)]
 pub struct ArgDef<'def, 'tar> {
@@ -69,6 +72,9 @@ pub struct ArgDef<'def, 'tar> {
 pub enum ArgDefKind<'def, 'tar> {
     Positional { 
         target: &'tar mut SingleTarget,
+    },
+    Subcommand {
+        handler: SubCmd<'def>,
     },
     Trail { 
         optional: bool, 
@@ -92,7 +98,7 @@ pub enum ArgDefKind<'def, 'tar> {
     },
 }
 
-// TODO: Make 'short'-setting safe by using an Into<> pattern.
+// MAYBE: Make 'short'-setting safe somehow.
 impl<'def, 'tar> ArgDef<'def, 'tar> {
     fn new<N>(name: N, kind: ArgDefKind<'def, 'tar>) -> ArgDef<'def, 'tar> 
       where N: Into<Cow<'def, str>> 
@@ -122,6 +128,14 @@ impl<'def, 'tar> ArgDef<'def, 'tar> {
       where N: Into<Cow<'def, str>>
     {
         ArgDef::new(name, ArgDefKind::Trail { optional, target })
+    }
+    
+    /// Creates a description of a subcommand.
+    pub fn cmd<N, F>(name: N, handler: F) -> ArgDef<'def, 'tar>
+      where N: Into<Cow<'def, str>>,
+            F: 'static + FnMut(&[&str]) -> Result<(), ParseError<'def>>
+    {
+        ArgDef::new(name, ArgDefKind::Subcommand { handler: Box::new(handler) })
     }
     
     /// Creates a description of an `interrupt`-type argument.
@@ -166,7 +180,8 @@ impl<'def, 'tar> ArgDef<'def, 'tar> {
     
     /// Adds a short identifier for this option, like `-h` for `help`.
     ///
-    /// **NOTE**: This method PANICS if used on a `positional` or `trail` description.
+    /// **NOTE**: This method PANICS if used on a `positional`, `trail` or 
+    /// `subcommand` description.
     ///
     /// # Example
     /// ```
@@ -179,8 +194,8 @@ impl<'def, 'tar> ArgDef<'def, 'tar> {
     pub fn short<N>(mut self, short: N) -> Self where N: Into<Cow<'def, str>> {
         use self::ArgDefKind::*;
         self.kind = match self.kind {
-            Positional { .. } | Trail { .. } => {
-                panic!("Positional and trail arguments cannot have a short identified");
+            Positional { .. } | Trail { .. } | Subcommand { .. } => {
+                panic!("Positional, trail and subcommand arguments cannot have a short identifier");
             },
             Flag { target, .. } => Flag { short: Some(short.into()), target },
             Count { target, .. } => Count { short: Some(short.into()), target },

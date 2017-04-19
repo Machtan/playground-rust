@@ -2,9 +2,79 @@ extern crate playground;
 
 use std::env;
 use std::iter;
-use playground::{ArgDef, parse, ParseStatus, default_help_interrupt, default_version_interrupt};
+use playground::{ArgDef, parse, ParseError, default_help_interrupt, default_version_interrupt};
+use std::process;
 
 fn main() {
+    if let Some(exit_code) = epub_main() {
+        process::exit(exit_code);
+    }
+}
+
+#[allow(unused)]
+fn epub_main() -> Option<i32> {
+    let args = env::args().skip(1).collect::<Vec<_>>();
+    let description = "
+        Program to create ePub e-book files.
+    ";
+    
+    match parse(&args, vec![
+        ArgDef::cmd("create", |args| {
+            parse(args, vec![])?;
+            Ok(())
+        })
+        .help("Creates a new ePub from a given specification."),
+        
+        ArgDef::cmd("example", |args| {
+            parse(args, vec![])?;
+            Ok(())
+        })
+        .help("Prints a template for an ePub specification file."),
+        
+        ArgDef::cmd("from_folder", |args| {
+            let mut folder = String::new();
+            parse(args, vec![
+                ArgDef::pos("folder", &mut folder)
+                    .help("The folder to load images from."),
+                
+                default_help_interrupt("epub from_folder", 
+                "
+                    Creates a simple epub from the images in the given folder.
+                    This is useful for quickly creating rather bad comic epubs.
+                "),
+            ])?;
+            
+            println!("Creating epub from folder '{}'...", folder);
+            
+            Ok(())
+        })
+        .help("Creates a simple ePub from the images in the given folder."),
+        
+        default_help_interrupt("epub", description).short("h"),
+        default_version_interrupt(),
+    ]) {
+        Ok(_) => {},
+        Err(ParseError::Interrupted(name)) => {
+            println!("Parse interrupted: <{}>", name);
+            return None;
+        }
+        Err(ParseError::InvalidDefinitions(msg)) => {
+            panic!(msg);
+        }
+        // PROBLEM: Usage is not shown for subcommands.
+        // I should make a way of handling it in the subcommand or passing through.
+        Err(ParseError::ParseFailed(msg, help)) => {
+            println!("Parse failed: {}", msg);
+            help.print_usage("epub");
+            return Some(1);
+        }
+    };
+    
+    None
+}
+
+#[allow(unused)]
+fn argonaut_main() -> Option<i32> {
     let args = env::args().skip(1).collect::<Vec<_>>();
     
     let mut first = String::new();
@@ -21,7 +91,7 @@ fn main() {
         Showcases the features of the library.
     ";
     
-    let res = match parse(&args, vec![
+    match parse(&args, vec![
         ArgDef::pos("first", &mut first)
             .help("The first argument."),
         ArgDef::pos("second", &mut second)
@@ -38,24 +108,23 @@ fn main() {
         ArgDef::flag("verbose", &mut verbose).short("v")
             .help("Print as much information as possible."),
         
-        default_help_interrupt(description).short("h"),
+        default_help_interrupt("argonaut", description).short("h"),
         default_version_interrupt(),
     ]) {
-        Ok(res) => res,
-        Err((msg, help)) => {
+        Ok(_) => {},
+        Err(ParseError::Interrupted(name)) => {
+            println!("Parse interrupted: <{}>", name);
+            return None;
+        }
+        Err(ParseError::InvalidDefinitions(msg)) => {
+            panic!(msg);
+        }
+        Err(ParseError::ParseFailed(msg, help)) => {
             println!("Parse failed: {}", msg);
-            help.print_usage();
-            return;
+            help.print_usage("argonaut");
+            return Some(1);
         }
     };
-    
-    match res {
-        ParseStatus::Success => {}
-        ParseStatus::Interrupted(name) => {
-            println!("Parse interrupted: <{}>", name);
-            return;
-        }
-    }
     
     println!("First:   {}", first);
     println!("Second:  {}", second);
@@ -71,4 +140,6 @@ fn main() {
         println!("Nothing's cool anymore");
     }
     println!("Library rating: {}", iter::repeat('*').take(stars).collect::<String>());
+    
+    None
 }

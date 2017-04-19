@@ -12,7 +12,9 @@ The lifetime of argument definition passed to `parse`
 The lifetime of target pointers used when defining arguments.
 */
 
+#![feature(conservative_impl_trait)]
 #![feature(unicode)]
+
 extern crate std_unicode;
 
 mod argdef;
@@ -20,7 +22,7 @@ mod help;
 mod parse;
 
 pub use argdef::{ArgDef, ArgDefKind, SingleTarget, CollectionTarget, OptionTarget};
-pub use parse::{parse, ParseStatus};
+pub use parse::{parse, ParseError};
 
 use std::borrow::{Cow};
 
@@ -47,13 +49,15 @@ Tasks
 */
 
 /// Creates a default help interrupt for `--help`.
-pub fn default_help_interrupt<'def, 'tar, D>(description: D)
+pub fn default_help_interrupt<'def, 'tar, P, D>(progname: P, description: D)
         -> ArgDef<'def, 'tar> 
-  where D: Into<Cow<'static, str>>
+  where D: Into<Cow<'static, str>>,
+        P: Into<Cow<'static, str>>
 {
+    let progname = progname.into();
     let description = description.into();
     ArgDef::interrupt("help", move |help| {
-        help.print_help(description.as_ref());
+        help.print_help(progname.as_ref(), description.as_ref());
     }).help("Print this message and abort.")
 }
 
