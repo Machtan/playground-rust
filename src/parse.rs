@@ -88,6 +88,15 @@ impl<'def, 'tar> ParseState<'def, 'tar> {
     }
 }
 
+fn validate_short<'def, N: AsRef<str>>(name: &N) -> Result<(), ParseError<'def>> {
+    let name = name.as_ref();
+    if name.starts_with("-") {
+        ParseError::defs(format!("Invalid short identifier '{}'. Short ids may not start with '-'.", name))
+    } else {
+        Ok(())
+    }
+}
+
 /// Sorts the given definitions and checks that all invariants are upheld.
 pub fn parse_definitions<'def, 'tar>(defs: Vec<ArgDef<'def, 'tar>>) 
         -> Result<ParseState<'def, 'tar>, ParseError<'def>> {
@@ -129,6 +138,7 @@ pub fn parse_definitions<'def, 'tar>(defs: Vec<ArgDef<'def, 'tar>>)
             }
             ArgDefKind::Flag { short, target } => {
                 if let Some(short) = short {
+                    validate_short(&short)?;
                     if short_map.contains_key(&short) {
                         return ParseError::defs(format!("Short name '{}' defined twice.", short));
                     }
@@ -141,6 +151,7 @@ pub fn parse_definitions<'def, 'tar>(defs: Vec<ArgDef<'def, 'tar>>)
             }
             ArgDefKind::Count { short, target } => {
                 if let Some(short) = short {
+                    validate_short(&short)?;
                     if short_map.contains_key(&short) {
                         return ParseError::defs(format!("Short name '{}' defined twice.", short));
                     }
@@ -153,6 +164,7 @@ pub fn parse_definitions<'def, 'tar>(defs: Vec<ArgDef<'def, 'tar>>)
             }
             ArgDefKind::OptArg { short, target } => {
                 if let Some(short) = short {
+                    validate_short(&short)?;
                     if short_map.contains_key(&short) {
                         return ParseError::defs(format!("Short name '{}' defined twice.", short));
                     }
@@ -165,6 +177,7 @@ pub fn parse_definitions<'def, 'tar>(defs: Vec<ArgDef<'def, 'tar>>)
             }
             ArgDefKind::Interrupt { short, callback } => {
                 if let Some(short) = short {
+                    validate_short(&short)?;
                     if short_map.contains_key(&short) {
                         return ParseError::defs(format!("Short name '{}' defined twice.", short));
                     }
@@ -188,7 +201,7 @@ pub enum ParseError<'def> {
     /// The parse could not finish succesfully.
     ParseFailed(String, Rc<Help<'def>>),
     
-    /// A subcommand failed to parse.
+    /// A subcommand failed to parse, and has been handled.
     SubParseFailed,
     
     /// An interrupt-flag with the given name was encountered.
@@ -213,7 +226,9 @@ impl<'def> ParseError<'def> {
 }
 
 /// Parses the given arguments and updates the defined variables with them.
-pub fn parse<'def, 'tar, T, P: Into<String>>(program: P, args: &[T], definitions: Vec<ArgDef<'def, 'tar>>) 
+/// This version does not print usage in the case of parse errors, nor does 
+/// it 'un-propagate' parsing errors.
+pub fn parse_plain<'def, 'tar, T, P: Into<String>>(program: P, args: &[T], definitions: Vec<ArgDef<'def, 'tar>>) 
     -> Result<(), ParseError<'def>>
   where T: Borrow<str> 
 { 
@@ -283,11 +298,20 @@ pub fn parse<'def, 'tar, T, P: Into<String>>(program: P, args: &[T], definitions
     Ok(())
 }
 
-pub fn parse_subcommand<'def, 'tar, T, P: Into<String>>(program: P, args: &[T], definitions: Vec<ArgDef<'def, 'tar>>) 
+/// Parses the given arguments and updates the defined variables with them.
+/// 
+/// Errors are handled like this:
+/// - Invalid argument definitions (logic error): Panic.
+/// - Parse failed: Print usage and prevent the error from propagating.
+/// - Interrupt or sub parse failed: Just passed along.
+pub fn parse<'def, 'tar, T, P: Into<String>>(program: P, args: &[T], definitions: Vec<ArgDef<'def, 'tar>>) 
     -> Result<(), ParseError<'def>>
   where T: Borrow<str> 
 { 
-    match parse(program, args, definitions) {
+    match parse_plain(program, args, definitions) {
+        Err(ParseError::InvalidDefinitions(msg)) => {
+            panic!("Invalid definitions: {}", msg);
+        }
         Err(ParseError::ParseFailed(msg, help)) => {
             println!("Parse failed: {}", msg);
             help.print_usage();

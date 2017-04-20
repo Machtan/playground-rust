@@ -2,7 +2,7 @@ extern crate playground;
 
 use std::env;
 use std::iter;
-use playground::{ArgDef, parse, parse_subcommand, ParseError, help_arg, version_arg};
+use playground::{ArgDef, parse, ParseError, help_arg, version_arg};
 use std::process;
 
 fn main() {
@@ -24,19 +24,22 @@ fn epub_main() -> Option<i32> {
             let mut target_path: Option<String> = None;
             let mut is_raw_spec = false;
             
-            parse_subcommand(program, args, vec![
+            parse(program, args, vec![
                 ArgDef::pos("spec_file", &mut spec_file)
                     .help("The TOML specification of the book"),
+                
                 ArgDef::option("target_path", &mut target_path).short("t")
                     .help("
                         A specific path to compile the ePub to. Defaults to a
                         name/author coupling in the current working directory
                     "),
+                
                 ArgDef::flag("is_raw_spec", &mut is_raw_spec).short("r")
                     .help("
                         Interpret the spec-file argument as the contents of the 
                         specification file, instead of a path to it.
                     "),
+                
                 help_arg("
                     Compiles an ePub from a markdown source and a TOML specification. The files in
                     the specification are sought relatively to the location of the specification
@@ -53,7 +56,7 @@ fn epub_main() -> Option<i32> {
         .help("Creates a new ePub from a given specification."),
         
         ArgDef::cmd("example", |program, args| {
-            parse_subcommand(program, args, vec![])?;
+            parse(program, args, vec![])?;
             Ok(())
         })
         .help("Prints a template for an ePub specification file."),
@@ -81,25 +84,10 @@ fn epub_main() -> Option<i32> {
         help_arg(description).short("h"),
         version_arg(),
     ]) {
-        Ok(_) => {},
-        Err(ParseError::Interrupted(name)) => {
-            println!("Parse interrupted: <{}>", name);
-            return None;
-        }
-        Err(ParseError::InvalidDefinitions(msg)) => {
-            panic!(msg);
-        }
-        Err(ParseError::ParseFailed(msg, help)) => {
-            println!("Parse failed: {}", msg);
-            help.print_usage();
-            return Some(1);
-        }
-        Err(ParseError::SubParseFailed) => {
-            return Some(1);
-        }
-    };
-    
-    None
+        Ok(_) => None,
+        Err(ParseError::Interrupted(_)) => None,
+        Err(_) => Some(1),
+    }
 }
 
 #[allow(unused)]
@@ -141,21 +129,8 @@ fn argonaut_main() -> Option<i32> {
         version_arg(),
     ]) {
         Ok(_) => {},
-        Err(ParseError::Interrupted(name)) => {
-            println!("Parse interrupted: <{}>", name);
-            return None;
-        }
-        Err(ParseError::InvalidDefinitions(msg)) => {
-            panic!(msg);
-        }
-        Err(ParseError::ParseFailed(msg, help)) => {
-            println!("Parse failed: {}", msg);
-            help.print_usage();
-            return Some(1);
-        }
-        Err(ParseError::SubParseFailed) => {
-            return Some(1);
-        }
+        Err(ParseError::Interrupted(_)) => {},
+        Err(_) => return Some(1),
     };
     
     println!("First:   {}", first);

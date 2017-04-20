@@ -22,7 +22,7 @@ mod help;
 mod parse;
 
 pub use argdef::{ArgDef, ArgDefKind, SingleTarget, CollectionTarget, OptionTarget};
-pub use parse::{parse, parse_subcommand, ParseError};
+pub use parse::{parse, parse_plain, ParseError};
 
 use std::borrow::{Cow};
 
@@ -43,16 +43,21 @@ return success
 
 /*
 Tasks
-- Validate 'short' identifiers
 
 Optional
-- Make a default handler function for parse results.
 - Implement a validate->assign->modify procedure in parse
+- Make a passthrough argument (cargo run -- --help)
 
 Done
 - Usage generator (printer)
 - Help generator (printer)
 - Simple subcommand abstraction
+- Validate 'short' identifiers
+- Change default parse function to write usage (no parse_subcommand)
+
+Abandoned
+- Make a default handler function for parse results.
+
 */
 
 /// Creates a default help interrupt for `--help`.
