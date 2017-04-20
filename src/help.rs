@@ -22,6 +22,8 @@ fn write_trimmed_n<'def, T: AsRef<str>>(s: &mut String, prefix: &str, text: T) {
 /// A collection of descriptions of the defined arguments.
 #[derive(Debug)]
 pub struct Help<'def> {
+    /// The 'command path' of the run program, eg. `cargo` or `cargo new`.
+    pub program: String,
     /// Positional arguments.
     pub positional: Vec<(Cow<'def, str>, Option<Cow<'def, str>>)>,
     /// Trailing positional vararg.
@@ -36,7 +38,7 @@ pub struct Help<'def> {
 
 impl<'def> Help<'def> {
     /// Creates a new help object from the given descriptions.
-    pub fn from_definitions<'tar>(definitions: &[ArgDef<'def, 'tar>]) -> Help<'def> {
+    pub fn new<'tar>(program: String, definitions: &[ArgDef<'def, 'tar>]) -> Help<'def> {
         let mut positional = Vec::new();
         let mut trail = None;
         let mut options = Vec::new();
@@ -82,11 +84,11 @@ impl<'def> Help<'def> {
                 }
             }
         }
-        Help { positional, trail, subcommands, options, help_defined }
+        Help { program, positional, trail, subcommands, options, help_defined }
     }
     
-    fn write_usage_into(&self, s: &mut String, progname: &str) {
-        s.push_str(progname);
+    fn write_usage_into(&self, s: &mut String) {
+        s.push_str(&self.program);
         
         if ! self.options.is_empty() {
             if self.help_defined {
@@ -128,22 +130,22 @@ impl<'def> Help<'def> {
     }
     
     /// Generates a usage message for this program.
-    pub fn usage_message(&self, progname: &str) -> String {
+    pub fn usage_message(&self) -> String {
         let mut s = String::new();
-        self.write_usage_into(&mut s, progname);
+        self.write_usage_into(&mut s);
         s
     }
     
     /// Prints a usage message for this program.
-    pub fn print_usage(&self, progname: &str) {
-        println!("Usage: {}", self.usage_message(progname));
+    pub fn print_usage(&self) {
+        println!("Usage: {}", self.usage_message());
     }
     
     /// Generates a help message for this program, using the given program
     /// description. The description may be left blank.
-    pub fn help_message(&self, progname: &str, description: &str) -> String {
+    pub fn help_message(&self, description: &str) -> String {
         let mut s = String::from("Usage:\n  ");
-        self.write_usage_into(&mut s, progname);
+        self.write_usage_into(&mut s);
         
         let has_description = description != "";
         let has_positional = (! self.positional.is_empty()) || self.trail.is_some();
@@ -154,6 +156,7 @@ impl<'def> Help<'def> {
         }
         
         if has_description {
+            s.push_str("Description:\n");
             write_trimmed_n(&mut s, "  ", description);
         }
         
@@ -227,8 +230,8 @@ impl<'def> Help<'def> {
     
     /// Prints a help message for this program, using the given program
     /// description. The description may be left blank.
-    pub fn print_help(&self, progname: &str, description: &str) {
-        print!("{}", self.help_message(progname, description));
+    pub fn print_help(&self, description: &str) {
+        print!("{}", self.help_message(description));
     }
 }
 

@@ -58,7 +58,7 @@ impl<T> CollectionTarget for Vec<T> where T: Debug + FromStr {
     }
 }
 
-pub type SubCmd<'def> = Box<FnMut(&[&str]) -> Result<(), ParseError<'def>>>;
+pub type SubCmd<'def> = Box<FnMut(String, &[&str]) -> Result<(), ParseError<'def>>>;
 
 /// The description of an expected argument.
 //#[derive(Debug)]
@@ -133,7 +133,7 @@ impl<'def, 'tar> ArgDef<'def, 'tar> {
     /// Creates a description of a subcommand.
     pub fn cmd<N, F>(name: N, handler: F) -> ArgDef<'def, 'tar>
       where N: Into<Cow<'def, str>>,
-            F: 'static + FnMut(&[&str]) -> Result<(), ParseError<'def>>
+            F: 'static + FnMut(String, &[&str]) -> Result<(), ParseError<'def>>
     {
         ArgDef::new(name, ArgDefKind::Subcommand { handler: Box::new(handler) })
     }

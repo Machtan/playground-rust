@@ -2,7 +2,7 @@ extern crate playground;
 
 use std::env;
 use std::iter;
-use playground::{ArgDef, parse, ParseError, default_help_interrupt, default_version_interrupt};
+use playground::{ArgDef, parse, parse_subcommand, ParseError, help_arg, version_arg};
 use std::process;
 
 fn main() {
@@ -18,26 +18,54 @@ fn epub_main() -> Option<i32> {
         Program to create ePub e-book files.
     ";
     
-    match parse(&args, vec![
-        ArgDef::cmd("create", |args| {
-            parse(args, vec![])?;
+    match parse("epub", &args, vec![
+        ArgDef::cmd("create", |program, args| {
+            let mut spec_file = String::new();
+            let mut target_path: Option<String> = None;
+            let mut is_raw_spec = false;
+            
+            parse_subcommand(program, args, vec![
+                ArgDef::pos("spec_file", &mut spec_file)
+                    .help("The TOML specification of the book"),
+                ArgDef::option("target_path", &mut target_path).short("t")
+                    .help("
+                        A specific path to compile the ePub to. Defaults to a
+                        name/author coupling in the current working directory
+                    "),
+                ArgDef::flag("is_raw_spec", &mut is_raw_spec).short("r")
+                    .help("
+                        Interpret the spec-file argument as the contents of the 
+                        specification file, instead of a path to it.
+                    "),
+                help_arg("
+                    Compiles an ePub from a markdown source and a TOML specification. The files in
+                    the specification are sought relatively to the location of the specification
+                    file, so use absolute paths when needed. If no arguments are given, the
+                    created file will be found in the active working directory.
+                "),
+            ])?;
+            
+            println!("Creating epub from spec: '{}' (target_path: {:?}, is raw spec?: {})", 
+                spec_file, target_path, is_raw_spec);
+            
             Ok(())
         })
         .help("Creates a new ePub from a given specification."),
         
-        ArgDef::cmd("example", |args| {
-            parse(args, vec![])?;
+        ArgDef::cmd("example", |program, args| {
+            parse_subcommand(program, args, vec![])?;
             Ok(())
         })
         .help("Prints a template for an ePub specification file."),
         
-        ArgDef::cmd("from_folder", |args| {
+        ArgDef::cmd("from_folder", |program, args| {
             let mut folder = String::new();
-            parse(args, vec![
+            
+            parse(program, args, vec![
                 ArgDef::pos("folder", &mut folder)
                     .help("The folder to load images from."),
                 
-                default_help_interrupt("epub from_folder", 
+                help_arg(
                 "
                     Creates a simple epub from the images in the given folder.
                     This is useful for quickly creating rather bad comic epubs.
@@ -50,8 +78,8 @@ fn epub_main() -> Option<i32> {
         })
         .help("Creates a simple ePub from the images in the given folder."),
         
-        default_help_interrupt("epub", description).short("h"),
-        default_version_interrupt(),
+        help_arg(description).short("h"),
+        version_arg(),
     ]) {
         Ok(_) => {},
         Err(ParseError::Interrupted(name)) => {
@@ -61,11 +89,12 @@ fn epub_main() -> Option<i32> {
         Err(ParseError::InvalidDefinitions(msg)) => {
             panic!(msg);
         }
-        // PROBLEM: Usage is not shown for subcommands.
-        // I should make a way of handling it in the subcommand or passing through.
         Err(ParseError::ParseFailed(msg, help)) => {
             println!("Parse failed: {}", msg);
-            help.print_usage("epub");
+            help.print_usage();
+            return Some(1);
+        }
+        Err(ParseError::SubParseFailed) => {
             return Some(1);
         }
     };
@@ -91,7 +120,7 @@ fn argonaut_main() -> Option<i32> {
         Showcases the features of the library.
     ";
     
-    match parse(&args, vec![
+    match parse("argonaut", &args, vec![
         ArgDef::pos("first", &mut first)
             .help("The first argument."),
         ArgDef::pos("second", &mut second)
@@ -108,8 +137,8 @@ fn argonaut_main() -> Option<i32> {
         ArgDef::flag("verbose", &mut verbose).short("v")
             .help("Print as much information as possible."),
         
-        default_help_interrupt("argonaut", description).short("h"),
-        default_version_interrupt(),
+        help_arg(description).short("h"),
+        version_arg(),
     ]) {
         Ok(_) => {},
         Err(ParseError::Interrupted(name)) => {
@@ -121,7 +150,10 @@ fn argonaut_main() -> Option<i32> {
         }
         Err(ParseError::ParseFailed(msg, help)) => {
             println!("Parse failed: {}", msg);
-            help.print_usage("argonaut");
+            help.print_usage();
+            return Some(1);
+        }
+        Err(ParseError::SubParseFailed) => {
             return Some(1);
         }
     };

@@ -22,7 +22,7 @@ mod help;
 mod parse;
 
 pub use argdef::{ArgDef, ArgDefKind, SingleTarget, CollectionTarget, OptionTarget};
-pub use parse::{parse, ParseError};
+pub use parse::{parse, parse_subcommand, ParseError};
 
 use std::borrow::{Cow};
 
@@ -43,26 +43,31 @@ return success
 
 /*
 Tasks
-- DONE Usage generator (printer)
-- DONE Help generator (printer)
+- Validate 'short' identifiers
+
+Optional
+- Make a default handler function for parse results.
+- Implement a validate->assign->modify procedure in parse
+
+Done
+- Usage generator (printer)
+- Help generator (printer)
 - Simple subcommand abstraction
 */
 
 /// Creates a default help interrupt for `--help`.
-pub fn default_help_interrupt<'def, 'tar, P, D>(progname: P, description: D)
+pub fn help_arg<'def, 'tar, D>(description: D)
         -> ArgDef<'def, 'tar> 
-  where D: Into<Cow<'static, str>>,
-        P: Into<Cow<'static, str>>
+  where D: Into<Cow<'static, str>>
 {
-    let progname = progname.into();
     let description = description.into();
     ArgDef::interrupt("help", move |help| {
-        help.print_help(progname.as_ref(), description.as_ref());
+        help.print_help(description.as_ref());
     }).help("Print this message and abort.")
 }
 
 /// Creates a default version interrupt for `--version`.
-pub fn default_version_interrupt<'def, 'tar>() -> ArgDef<'def, 'tar> {
+pub fn version_arg<'def, 'tar>() -> ArgDef<'def, 'tar> {
     ArgDef::interrupt("version", |_| {
         println!("{}", option_env!("CARGO_PKG_VERSION").unwrap_or("0.0.0"));
     }).help("Print version string and abort.")

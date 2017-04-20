@@ -188,6 +188,9 @@ pub enum ParseError<'def> {
     /// The parse could not finish succesfully.
     ParseFailed(String, Rc<Help<'def>>),
     
+    /// A subcommand failed to parse.
+    SubParseFailed,
+    
     /// An interrupt-flag with the given name was encountered.
     /// 
     /// The variables pointed to by the definitions will not all have been
@@ -210,11 +213,12 @@ impl<'def> ParseError<'def> {
 }
 
 /// Parses the given arguments and updates the defined variables with them.
-pub fn parse<'def, 'tar, T>(args: &[T], definitions: Vec<ArgDef<'def, 'tar>>) 
+pub fn parse<'def, 'tar, T, P: Into<String>>(program: P, args: &[T], definitions: Vec<ArgDef<'def, 'tar>>) 
     -> Result<(), ParseError<'def>>
   where T: Borrow<str> 
 { 
-    let help = Rc::new(Help::from_definitions(&definitions));
+    let program = program.into();
+    let help = Rc::new(Help::new(program.clone(), &definitions));
     let mut defs = parse_definitions(definitions)?;
     
     //println!("Defs: {:?}", defs);
@@ -242,7 +246,8 @@ pub fn parse<'def, 'tar, T>(args: &[T], definitions: Vec<ArgDef<'def, 'tar>>)
         } else if ! defs.subcommands.is_empty() {
             if let Some(handler) = defs.subcommands.get_mut(arg) {
                 let rest = args.collect::<Vec<_>>();
-                return handler(&rest);
+                let subprogram = format!("{} {}", program, arg);
+                return handler(subprogram, &rest);
             } else {
                 return ParseError::parse(format!("Unknown subcommand: '{}'", arg), help);
             }
@@ -271,5 +276,23 @@ pub fn parse<'def, 'tar, T>(args: &[T], definitions: Vec<ArgDef<'def, 'tar>>)
         }
     }
     
+    if ! defs.subcommands.is_empty() {
+        return ParseError::parse(format!("No subcommand specified"), help);
+    }
+    
     Ok(())
+}
+
+pub fn parse_subcommand<'def, 'tar, T, P: Into<String>>(program: P, args: &[T], definitions: Vec<ArgDef<'def, 'tar>>) 
+    -> Result<(), ParseError<'def>>
+  where T: Borrow<str> 
+{ 
+    match parse(program, args, definitions) {
+        Err(ParseError::ParseFailed(msg, help)) => {
+            println!("Parse failed: {}", msg);
+            help.print_usage();
+            Err(ParseError::SubParseFailed)
+        }
+        other => other,
+    }
 }
